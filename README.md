@@ -1,28 +1,38 @@
-R-Helper — Razer Blade control UI (Windows)
+# R-Helper v0.3.0
 
-Overview
-- Lightweight egui app to toggle performance modes, fans, logo lighting, and battery care on Razer Blade laptops.
-- Uses a locally vendored `librazer` library derived from blauzim/razer-ctl.
-- No GPU management; no UAC elevation.
+A Windows application for controlling Razer Blade settings w/o Synapse.
 
-Build
-- Prereqs: Rust stable (MSVC toolchain) on Windows.
-- Build: `cargo build --release`
-- Run: `target/release/rhelper.exe`
+## Features
 
-Notes
-- App icon is embedded via `razer-gui.rc` and `rhelper.ico`.
-- No admin required.
-- Custom mode is shown disabled; if active externally (e.g., via Synapse), it appears muted-green but remains non-clickable.
+- Performance modes: Battery, Silent, Balanced, Performance, Hyperboost
+	- Custom is shown disabled; if active externally, it appears muted-green but remains non-clickable
+- Fan control: Auto/Manual, with current RPM display
+- Keyboard backlight: Brightness control
+- Logo lighting: Static, Breathing, Off
+- Battery care: Toggle charging threshold (80%)
 
-Supported
-- Tested primarily on Razer Blade 16 (2025), should work on other Blades that expose similar HID features.
 
-Credits
-- Based on and inspired by: https://github.com/blauzim/razer-ctl (MIT)
+## Installation
 
-License
-- MIT. See LICENSE. See NOTICE and THIRD_PARTY_LICENSES.md for attributions.
+1. Download the latest release
+2. Extract anywhere
+3. Run `rhelper.exe`
 
-Disclaimer
-- “Razer” is a trademark of Razer Inc. This project is not affiliated with or endorsed by Razer.
+## Building
+
+```powershell
+cargo build --release
+```
+
+## Architecture
+
+- Core device control via locally vendored `librazer` (derived from razer-ctl)
+- egui UI with modular sections; no GPU management
+
+## License
+
+MIT. Includes MIT-licensed portions derived from razer-ctl (see NOTICE and THIRD_PARTY_LICENSES.md).
+
+## Support
+
+If you really want to express gratitude: [PayPal Donation](https://www.paypal.com/paypalme/fatalutionDE)
