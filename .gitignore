@@ -15,5 +15,6 @@ Thumbs.db
 rhelper-distribution/*.zip
 rhelper-distribution/*.exe
 rhelper.zip
+*.zip
 *.log
 dist/
