@@ -26,8 +26,8 @@ cargo build --release
 
 ## Architecture
 
-- Core device control via locally vendored `librazer` (derived from razer-ctl)
-- egui UI with modular sections; no GPU management
+Core device control via locally vendored `librazer` (derived from razer-ctl)
+
 
 ## License
 
