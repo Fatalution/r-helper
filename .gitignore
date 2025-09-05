@@ -1,0 +1,18 @@
+# Build outputs
+/target/
+**/*.d
+**/*.pdb
+
+# OS junk
+Thumbs.db
+.DS_Store
+
+# IDE/editor
+.vscode/
+.idea/
+
+# Local artifacts
+rhelper-distribution/*.zip
+rhelper-distribution/*.exe
+rhelper.zip
+*.log

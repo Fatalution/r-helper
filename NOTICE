@@ -1,0 +1,10 @@
+This project includes a modified version of librazer derived from blauzim/razer-ctl (MIT).
+Original project: https://github.com/blauzim/razer-ctl
+
+Attribution:
+- Original authors: tdakhran, blauzim and contributors.
+- Changes in this fork: Windows GUI, resource embedding, UI tweaks, polling, and device state UX improvements.
+
+Licenses:
+- R-Helper: MIT (see LICENSE)
+- razer-ctl (librazer): MIT

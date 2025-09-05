@@ -1,0 +1,5 @@
+#include <windows.h>
+
+// Application icon resource for Explorer and pinned taskbar
+#define IDI_APPICON 101
+IDI_APPICON ICON "rhelper.ico"
