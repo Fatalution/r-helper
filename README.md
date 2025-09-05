@@ -1,7 +1,8 @@
 # R-Helper
 
 A Windows application for controlling Razer Blade settings w/o Synapse.
-<img width="664" height="776" alt="image" src="https://github.com/user-attachments/assets/3a4630d8-d79a-4e6b-b6a6-df4f1f52bdb9" />
+
+<img width="332" height="388" alt="image" src="https://github.com/user-attachments/assets/3a4630d8-d79a-4e6b-b6a6-df4f1f52bdb9" />
 
 ## Features
 
