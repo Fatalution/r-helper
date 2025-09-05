@@ -18,7 +18,7 @@ pub fn render_footer(
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             if ui.button("🌐 GitHub").clicked() {
                 let _ = Command::new("cmd")
-                    .args(&["/c", "start", "https://github.com"])
+                    .args(&["/c", "start", "https://github.com/Fatalution/r-helper"])
                     .spawn();
             }
         });
