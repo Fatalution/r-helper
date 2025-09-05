@@ -23,8 +23,7 @@ A Windows application for controlling Razer Blade settings w/o Synapse.
 ## Installation
 
 1. Download the latest release
-2. Extract anywhere
-3. Run `rhelper.exe`
+2. Run `rhelper.exe`
 
 ## Building
 
