@@ -1,4 +1,4 @@
-# R-Helper v0.3.0
+# R-Helper
 
 A Windows application for controlling Razer Blade settings w/o Synapse.
 
