@@ -16,3 +16,4 @@ rhelper-distribution/*.zip
 rhelper-distribution/*.exe
 rhelper.zip
 *.log
+dist/
