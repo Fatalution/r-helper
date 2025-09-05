@@ -1,3 +1,9 @@
+> [!NOTE]  
+> I haven't coded in a while, so excuse me for vibe-coding my way through this.
+
+> [!WARNING]  
+> I won't be able to work on this as I am returning the Blade 16. I only uploaded this for the public to use and to potentially develop.  
+
 # R-Helper
 
 A Windows application for controlling Razer Blade settings w/o Synapse.
