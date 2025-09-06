@@ -1,6 +1,3 @@
-> [!NOTE]  
-> I haven't coded in a while, so excuse me for vibe-coding my way through this.
-
 > [!WARNING]  
 > Note from Fatalution: I won't be able to work on this as I am returning the Blade 16.   
 
