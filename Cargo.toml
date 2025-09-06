@@ -1,5 +1,5 @@
 [package]
-name = "razer-gui"
+name = "r-helper"
 version = "0.3.2"
 edition = "2021"
 description = "R-Helper - Razer Blade control interface"
