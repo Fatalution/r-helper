@@ -67,6 +67,20 @@ pub const SUPPORTED: &[Descriptor] = &[
         init_cmds : &[0x0081,0x0086,0x0f90,0x0086,0x0f10,0x0087],
     },
     Descriptor {
+        model_number_prefix: "RZ09-05287",
+        name: "Razer Blade 16” (2025) 5070",
+        pid: 0x02c6,
+        features: &[
+            "battery-care",
+            "fan",
+            "kbd-backlight",
+            "lid-logo",
+            "lights-always-on",
+            "perf",
+        ],
+        init_cmds : &[0x0081,0x0086,0x0f90,0x0086,0x0f10,0x0087],
+    },
+    Descriptor {
         model_number_prefix: "RZ09-0421N",
         name: "Razer Blade 15” (2022)",
         pid: 0x028a,
