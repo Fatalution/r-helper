@@ -355,15 +355,23 @@ impl RazerGuiApp {
                 let mut modes = Vec::new();
                 if let Ok(dev) = Device::detect() {
                     if let Ok((current_mode, _)) = command::get_perf_mode(&dev) {
+                        // Always include the currently reported mode
+                        modes.push(current_mode);
                         for m in PerfMode::iter() {
-                            if m == current_mode { modes.push(m); continue; }
+                            if m == current_mode { continue; }
                             if command::set_perf_mode(&dev, m).is_ok() {
-                                modes.push(m);
+                                // Confirm by reading back
+                                if let Ok((read_back, _)) = command::get_perf_mode(&dev) {
+                                    if read_back == m { modes.push(m); }
+                                }
                             }
                         }
                         let _ = command::set_perf_mode(&dev, current_mode);
                     }
                 }
+                // Deduplicate while preserving order
+                let mut seen = std::collections::HashSet::new();
+                modes.retain(|m| seen.insert(*m));
                 let _ = res_tx.send(modes);
             }
         });
