@@ -40,7 +40,6 @@ struct DeviceStatus {
     keyboard_brightness: u8,
     lights_always_on: bool,
     battery_care: bool,
-    // battery_threshold removed (not used)
 }
 
 impl Default for DeviceStatus {
@@ -51,7 +50,7 @@ impl Default for DeviceStatus {
             fan_rpm: None,
             fan_actual_rpm: None,
             logo_mode: "Reading...".to_string(),
-            keyboard_brightness: 0, // Will be read from device immediately
+            keyboard_brightness: 0,
             lights_always_on: false,
             battery_care: true,
             
@@ -64,7 +63,7 @@ struct RazerGuiApp {
     device: Option<Device>,
     device_state: Option<CompleteDeviceState>,
     system_specs: SystemSpecs,
-    available_performance_modes: Vec<PerfMode>, // Dynamically detected available modes
+    available_performance_modes: Vec<PerfMode>,
     
     ac_power: bool,
     ac_profile: CompleteDeviceState,
@@ -72,41 +71,35 @@ struct RazerGuiApp {
     
     loading: bool,
     fully_initialized: bool,
-    init_receiver: Option<mpsc::Receiver<InitMessage>>, // Channel for background initialization
+    init_receiver: Option<mpsc::Receiver<InitMessage>>,
     message_manager: MessageManager,
     last_refresh_time: std::time::Instant,
     last_state_check_time: std::time::Instant,
-    last_fan_enforce_time: std::time::Instant, // Track last manual fan RPM enforcement
+    last_fan_enforce_time: std::time::Instant,
     status_messages: bool,
-    // settings window removed
     
     manual_fan_rpm: u16,
-    temp_brightness_step: usize, // 0-15 step index for discrete brightness levels
-    brightness_slider_active: bool, // Track if user is actively using brightness slider
+    temp_brightness_step: usize,
+    brightness_slider_active: bool,
     should_quit: bool,
 
-    // Initialization progress flags
     init_power_read: bool,
     init_specs_complete: bool,
     last_perf_poll_time: std::time::Instant,
-    // Async perf-mode probe receiver
     probe_receiver: Option<mpsc::Receiver<Vec<PerfMode>>>,
 }
 
 impl RazerGuiApp {
     // Initialization
     
-    /// Convert PerfMode enum to display string (uses Debug name to be future-proof)
     fn perf_mode_to_string(mode: PerfMode) -> String {
         format!("{:?}", mode)
     }
     
-    /// Convert string to PerfMode enum by matching Debug names (future-proof)
     fn string_to_perf_mode(mode: &str) -> Option<PerfMode> {
         PerfMode::iter().find(|m| format!("{:?}", m) == mode)
     }
     
-    /// Convert LogoMode enum to display string
     fn logo_mode_to_string(mode: LogoMode) -> &'static str {
         match mode {
             LogoMode::Static => "Static",
@@ -115,7 +108,6 @@ impl RazerGuiApp {
         }
     }
     
-    /// Convert string to LogoMode enum
     fn string_to_logo_mode(mode: &str) -> Option<LogoMode> {
         match mode {
             "Static" => Some(LogoMode::Static),
@@ -179,7 +171,7 @@ impl RazerGuiApp {
             ac_power: true,
             ac_profile,
             battery_profile,
-            loading: true, // Start in loading state
+            loading: true,
             fully_initialized: false,
             init_receiver: Some(init_receiver),
             message_manager: MessageManager::new(),
@@ -294,10 +286,8 @@ impl RazerGuiApp {
                 let _ = sender.send(InitMessage::PowerStateRead(ac_power));
             }
 
-            // Mark initialization complete early to let UI proceed; specs will arrive later
             let _ = sender.send(InitMessage::InitializationComplete);
 
-            // Load system specs afterwards (slower) and send when ready
             let device_name_ref = device_name.as_deref();
             let system_specs = get_system_specs(device_name_ref);
             let _ = sender.send(InitMessage::SystemSpecsComplete(system_specs));
@@ -322,7 +312,6 @@ impl RazerGuiApp {
                 InitMessage::SystemSpecsComplete(specs) => {
                     self.system_specs = specs;
                     self.init_specs_complete = true;
-                    // Only show complete when all background init pieces are done
                     if self.fully_initialized && self.init_power_read && self.init_specs_complete {
                         self.set_status_message("Initialization complete".to_string());
                     } else {
@@ -332,12 +321,9 @@ impl RazerGuiApp {
                 InitMessage::PowerStateRead(ac_power) => {
                     self.ac_power = ac_power;
                     self.init_power_read = true;
-                    // Don't show message for initial power state
                 }
                 InitMessage::InitializationComplete => {
                     self.fully_initialized = true;
-                    // Do not show completion yet; wait for specs as well
-                    // Read device status from main thread since we can't clone Device
                     if self.device.is_some() {
                         if let Err(e) = self.read_device_status() {
                             self.set_error_message(format!("Failed to read device status: {}", e));
@@ -345,7 +331,6 @@ impl RazerGuiApp {
                             self.update_stored_device_state();
                             self.sync_ui_with_device_state();
                             self.init_fan_slider_from_device();
-                            // Start non-blocking perf mode probing if list unknown and not Custom
                             self.maybe_probe_perf_modes_async();
                         }
                     }
@@ -359,22 +344,15 @@ impl RazerGuiApp {
     }
 
     fn start_probe_perf_modes(&mut self, force: bool) {
-        // Only when device supported and descriptor didn’t specify modes
         let Some(ref device) = self.device else { return; };
         if !force && device.info().perf_modes.is_some() { return; }
-        // Don’t probe if current mode is Custom
         if let Ok((perf_mode, _)) = command::get_perf_mode(device) {
             if matches!(perf_mode, PerfMode::Custom) { return; }
         }
-        // Spawn a thread to probe; clone minimal info by device handle is not clonable, so use a weak pattern via channel
-        // Use a simple thread to probe and then set available_performance_modes on main thread via a queued closure
-        // Here, we’ll instead store results in a static parking_lot since egui main thread only; keep it simple: use a channel
         let (res_tx, res_rx) = std::sync::mpsc::channel::<Vec<PerfMode>>();
         std::thread::spawn({
-            // We cannot move &Device across thread safely; reopen via detect for probing
             move || {
                 let mut modes = Vec::new();
-                // Re-detect to open a fresh handle
                 if let Ok(dev) = Device::detect() {
                     if let Ok((current_mode, _)) = command::get_perf_mode(&dev) {
                         for m in PerfMode::iter() {
@@ -383,32 +361,24 @@ impl RazerGuiApp {
                                 modes.push(m);
                             }
                         }
-                        // try to restore
                         let _ = command::set_perf_mode(&dev, current_mode);
                     }
                 }
                 let _ = res_tx.send(modes);
             }
         });
-
-        // Poll result on future updates
-        // Store receiver to check later
         self.probe_receiver = Some(res_rx);
     }
 }
 
-/// Get fan ACTUAL RPM using librazer for live monitoring (not the SET RPM)
 fn get_fan_rpm_actual(device: &Device, zone: librazer::types::FanZone) -> Option<u16> {
-    // Use librazer for reliable ACTUAL fan RPM readings (live monitoring)
     match command::get_fan_actual_rpm(device, zone) {
         Ok(rpm) => Some(rpm),
         Err(_) => None,
     }
 }
 
-/// Get fan SET RPM using librazer (what the user configured)
 fn get_fan_rpm_set(device: &Device, zone: librazer::types::FanZone) -> Option<u16> {
-    // Use librazer to read the SET RPM value (user configuration)
     match command::get_fan_rpm(device, zone) {
         Ok(rpm) => Some(rpm),
         Err(_) => None,
@@ -417,35 +387,23 @@ fn get_fan_rpm_set(device: &Device, zone: librazer::types::FanZone) -> Option<u1
 
 impl RazerGuiApp {
 
-    // ========================================================================
-    // Device Control Methods
-    // ========================================================================
-
     fn read_device_status(&mut self) -> Result<()> {
-        let device = self.device.as_ref().unwrap(); // We know it exists from the caller
-        // Read performance mode
+    let device = self.device.as_ref().unwrap();
         let (perf_mode, fan_mode) = command::get_perf_mode(device)?;
         self.status.performance_mode = Self::perf_mode_to_string(perf_mode).to_string();
-
-        // Read fan status using new method
         let (fan_speed, fan_rpm) = Self::get_fan_status_from_mode(fan_mode, device);
         self.status.fan_speed = fan_speed;
         self.status.fan_rpm = fan_rpm;
         if let Some(rpm) = fan_rpm {
             self.manual_fan_rpm = rpm;
         }
-
-        // Read actual fan RPM for live readout using librazer
         self.status.fan_actual_rpm = get_fan_rpm_actual(device, librazer::types::FanZone::Zone1);
-
-        // Read lighting status
         if let Ok(logo_mode) = command::get_logo_mode(device) {
             self.status.logo_mode = Self::logo_mode_to_string(logo_mode).to_string();
         }
 
         if let Ok(brightness) = command::get_keyboard_brightness(device) {
             self.status.keyboard_brightness = brightness;
-            // Always update display on startup/refresh (brightness slider not active yet)
             self.temp_brightness_step = ui::lighting::raw_brightness_to_step_index(brightness);
         }
 
@@ -700,23 +658,16 @@ impl RazerGuiApp {
         };
         
         if let Some(ref device) = self.device {
-            // Read current fan settings before changing performance mode
             let (current_fan_mode, set_rpm) = Self::read_current_fan_state(device);
             
             match command::set_perf_mode(device, perf_mode) {
                 Ok(_) => {
                     self.status.performance_mode = mode.to_string();
                     
-                    // IMPORTANT: set_perf_mode() internally sets fan mode to Auto!
-                    // We need to restore the original fan settings with a small delay
                     if matches!(current_fan_mode, FanMode::Manual) {
                         if let Some(rpm) = set_rpm {
-                            // Small delay to let the performance mode change settle
                             std::thread::sleep(std::time::Duration::from_millis(50));
-                            
-                            // Restore manual mode first, then set RPM
                             if let Ok(_) = command::set_fan_mode(device, FanMode::Manual) {
-                                // Another small delay before setting RPM
                                 std::thread::sleep(std::time::Duration::from_millis(50));
                                 
                                 if let Ok(_) = command::set_fan_rpm(device, rpm, true) {
@@ -731,8 +682,6 @@ impl RazerGuiApp {
                             }
                         }
                     }
-                    // Note: Auto mode doesn't need restoration since set_perf_mode already sets it to Auto
-                    
                     self.set_optional_status_message(format!("Performance mode set to {}", mode));
                 },
                 Err(e) => {
@@ -773,7 +722,6 @@ impl RazerGuiApp {
     // GPU Mode Management - Apple-Style Clean Architecture
     // ========================================================================
     
-    // GPU switching/auto GPU handling removed
 
     fn set_fan_mode(&mut self, mode: &str, rpm: Option<u16>) {
         if let Some(ref device) = self.device {
@@ -859,7 +807,6 @@ impl RazerGuiApp {
         }
     }
 
-    // GPU UI section removed
 
     fn render_fan_section(&mut self, ui: &mut egui::Ui) {
         use ui::fan::{render_fan_section, FanAction};
@@ -1028,9 +975,7 @@ impl RazerGuiApp {
         }
     }
 
-    // settings window removed
-
-    // (Dynamic window sizing helpers removed as GPU section is gone)
+    
 }
 
 impl eframe::App for RazerGuiApp {
@@ -1055,9 +1000,7 @@ impl eframe::App for RazerGuiApp {
         // Update message manager
         self.message_manager.update();
         
-    // GPU section removed; no dynamic size based on GPU
         
-    // Focus-regain refresh removed; periodic polling handles updates
         
         // When minimized, poll infrequently to catch external performance mode changes
         let minimized = ctx.input(|i| i.viewport().minimized.unwrap_or(false));
@@ -1094,7 +1037,6 @@ impl eframe::App for RazerGuiApp {
 
         self.clear_status_message_if_disabled();
 
-    // GPU switching removed
         
         // Only update when window is not minimized to save resources
         if !ctx.input(|i| i.viewport().minimized.unwrap_or(false)) {
@@ -1110,7 +1052,6 @@ impl eframe::App for RazerGuiApp {
                                 self.ac_power = current_ac_power;
                                 self.auto_switch_profile();
                                 
-                                // GPU auto switching removed
                             }
                         }
                     
@@ -1182,7 +1123,6 @@ impl eframe::App for RazerGuiApp {
             self.render_performance_section(ui);
             ui.separator();
 
-            // GPU Section removed
 
             // Fan Section
             self.render_fan_section(ui);
@@ -1196,7 +1136,6 @@ impl eframe::App for RazerGuiApp {
             self.render_battery_section(ui);
         });
         
-    // Settings window removed
     }
 }fn load_icon() -> IconData {
     const ICON_DATA: &[u8] = include_bytes!("../rhelper.ico");
