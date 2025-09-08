@@ -4,7 +4,8 @@ use eframe::egui::{self, Layout, Align, Color32, RichText};
 const MIN_RPM_FOR_COLOR: f32 = 1900.0;
 const MAX_RPM_FOR_COLOR: f32 = 5000.0;
 const MIN_MANUAL_RPM: u16 = 2000;
-const MAX_MANUAL_RPM: u16 = 5000;
+// Increased to 5500 to expose full supported range (command layer allows 0..=5500)
+const MAX_MANUAL_RPM: u16 = 5500;
 const RPM_STEP: f64 = 100.0;
 const DARK_GREEN_MAX: u8 = 120;
 const ORANGE_MAX: u8 = 100;
