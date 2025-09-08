@@ -24,3 +24,13 @@ windows = { version = "0.56.0", features = [
 
 [build-dependencies]
 embed-resource = "2.4"
+
+[workspace]
+resolver = "2"
+members = [
+    ".",          # r-helper (GUI)
+    "librazer",   # shared lib
+]
+default-members = [
+    ".",          # build only the GUI by default (root crate)
+]

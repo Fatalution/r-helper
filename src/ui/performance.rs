@@ -25,6 +25,8 @@ pub enum PerformanceAction {
     None,
     /// Set a specific performance mode
     SetPerformanceMode(String),
+    /// Request probing supported modes
+    RefreshProbe,
 }
 
 /// Renders the performance section UI
@@ -46,11 +48,12 @@ pub fn render_performance_section(
     device_model: &str,
     gpu_models: &[String],
     available_modes: &[PerfMode],
+    show_probe_button: bool,
 ) -> PerformanceAction {
     let mut action = PerformanceAction::None;
     
     ui.group(|ui| {
-        render_performance_header(ui, ac_power);
+        render_performance_header(ui, ac_power, show_probe_button);
         ui.separator();
         
         // Performance Mode Selection
@@ -64,7 +67,7 @@ pub fn render_performance_section(
 }
 
 /// Renders the performance section header with power status
-fn render_performance_header(ui: &mut egui::Ui, ac_power: bool) {
+fn render_performance_header(ui: &mut egui::Ui, ac_power: bool, show_probe_button: bool) {
     ui.horizontal(|ui| {
         ui.add(egui::Label::new("🚀 Performance Mode").selectable(false));
         
@@ -76,6 +79,11 @@ fn render_performance_header(ui: &mut egui::Ui, ac_power: bool) {
         };
         
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            if show_probe_button {
+                if ui.small_button("↻").on_hover_text("Probe supported modes").clicked() {
+                    ui.ctx().data_mut(|d| d.insert_temp("perf_refresh".into(), true));
+                }
+            }
             ui.add(egui::Label::new(RichText::new(power_icon).color(power_color)).selectable(false));
             ui.add(egui::Label::new(RichText::new(if ac_power { "AC Power" } else { "Battery" })).selectable(false));
         });
@@ -104,6 +112,12 @@ fn render_performance_modes(
         // Render main performance modes (active ones) in preferred order
         let mut rendered: Vec<PerfMode> = Vec::new();
         for mode in &ordered_modes {
+        // Map header refresh flag into action and clear it
+        if ui.ctx().data(|d| d.get_temp::<bool>("perf_refresh".into()).unwrap_or(false)) {
+            ui.ctx().data_mut(|d| d.remove::<bool>("perf_refresh".into()));
+            action = PerformanceAction::RefreshProbe;
+        }
+
             if available_modes.contains(mode) {
                 let mode_str = format!("{:?}", mode);
                 let selected = current_performance_mode == mode_str;
