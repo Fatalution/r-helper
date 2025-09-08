@@ -1,5 +1,5 @@
 > [!WARNING]  
-> Note from Fatalution: I won't be able to work on this as I am returning the Blade 16.   
+> Note from Fatalution: I returned my Blade 16.    
 
 # R-Helper
 
