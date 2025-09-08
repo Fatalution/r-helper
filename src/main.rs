@@ -369,9 +369,6 @@ impl RazerGuiApp {
                         let _ = command::set_perf_mode(&dev, current_mode);
                     }
                 }
-                // Deduplicate while preserving order
-                let mut seen = std::collections::HashSet::new();
-                modes.retain(|m| seen.insert(*m));
                 let _ = res_tx.send(modes);
             }
         });
