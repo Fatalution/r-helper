@@ -11,11 +11,10 @@ pub struct Descriptor {
     pub init_cmds: &'static [u16],
     pub perf_modes: Option<&'static [PerfMode]>,
 }
-
 pub const SUPPORTED: &[Descriptor] = &[
         Descriptor {
-        model_number_prefix: "RZ09-0427N",
-        name: "Razer Blade 14” (2022) 3070 Ti",
+        model_number_prefix: "RZ09-0427",
+        name: "Razer Blade 14” (2022)",
         pid: 0x028c,
         features: &[
             "battery-care",
@@ -34,7 +33,7 @@ pub const SUPPORTED: &[Descriptor] = &[
         ]),
     },
     Descriptor {
-        model_number_prefix: "RZ09-0421N",
+        model_number_prefix: "RZ09-0421",
         name: "Razer Blade 15” (2022)",
         pid: 0x028a,
         features: &[
@@ -49,8 +48,8 @@ pub const SUPPORTED: &[Descriptor] = &[
     perf_modes: None,
     },
         Descriptor {
-        model_number_prefix: "RZ09-0482X",
-        name: "Razer Blade 14” (2023) Mercury",
+        model_number_prefix: "RZ09-0482",
+        name: "Razer Blade 14” (2023)",
         pid: 0x029d,
         features: &[
             "battery-care",
@@ -63,8 +62,8 @@ pub const SUPPORTED: &[Descriptor] = &[
     perf_modes: None,
     },
     Descriptor {
-        model_number_prefix: "RZ09-0483T",
-        name: "Razer Blade 16” (2023) Black",
+        model_number_prefix: "RZ09-0483",
+        name: "Razer Blade 16” (2023)",
         pid: 0x029f,
         features: &[
             "battery-care",
@@ -78,52 +77,8 @@ pub const SUPPORTED: &[Descriptor] = &[
     perf_modes: None,
     },
     Descriptor {
-        model_number_prefix: "RZ09-05287",
-        name: "Razer Blade 16” (2025) 5070",
-        pid: 0x02c6,
-        features: &[
-            "battery-care",
-            "fan",
-            "kbd-backlight",
-            "lid-logo",
-            "lights-always-on",
-            "perf",
-        ],
-        init_cmds : &[0x0081,0x0086,0x0f90,0x0086,0x0f10,0x0087],
-        perf_modes: Some(&[
-            PerfMode::Battery,
-            PerfMode::Silent,
-            PerfMode::Balanced,
-            PerfMode::Performance,
-            PerfMode::Hyperboost,
-            PerfMode::Custom,
-        ]),
-    },
-        Descriptor {
-        model_number_prefix: "RZ09-05288",
-        name: "Razer Blade 16” (2025) 5080",
-        pid: 0x02c6,
-        features: &[
-            "battery-care",
-            "fan",
-            "kbd-backlight",
-            "lid-logo",
-            "lights-always-on",
-            "perf",
-        ],
-        init_cmds : &[0x0081,0x0086,0x0f90,0x0086,0x0f10,0x0087],
-        perf_modes: Some(&[
-            PerfMode::Battery,
-            PerfMode::Silent,
-            PerfMode::Balanced,
-            PerfMode::Performance,
-            PerfMode::Hyperboost,
-            PerfMode::Custom,
-        ]),
-    },
-        Descriptor {
-        model_number_prefix: "RZ09-05289",
-        name: "Razer Blade 16” (2025) 5090",
+        model_number_prefix: "RZ09-0528",
+        name: "Razer Blade 16” (2025)",
         pid: 0x02c6,
         features: &[
             "battery-care",
