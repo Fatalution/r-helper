@@ -11,10 +11,9 @@ pub struct Descriptor {
     pub init_cmds: &'static [u16],
     pub perf_modes: Option<&'static [PerfMode]>,
 }
-
 pub const SUPPORTED: &[Descriptor] = &[
         Descriptor {
-        model_number_prefix: "RZ09-0427N",
+        model_number_prefix: "RZ09-0427",
         name: "Razer Blade 14” (2022) 3070 Ti",
         pid: 0x028c,
         features: &[
@@ -34,7 +33,7 @@ pub const SUPPORTED: &[Descriptor] = &[
         ]),
     },
     Descriptor {
-        model_number_prefix: "RZ09-0421N",
+        model_number_prefix: "RZ09-0421",
         name: "Razer Blade 15” (2022)",
         pid: 0x028a,
         features: &[
@@ -49,7 +48,7 @@ pub const SUPPORTED: &[Descriptor] = &[
     perf_modes: None,
     },
         Descriptor {
-        model_number_prefix: "RZ09-0482X",
+        model_number_prefix: "RZ09-0482",
         name: "Razer Blade 14” (2023) Mercury",
         pid: 0x029d,
         features: &[
@@ -63,7 +62,7 @@ pub const SUPPORTED: &[Descriptor] = &[
     perf_modes: None,
     },
     Descriptor {
-        model_number_prefix: "RZ09-0483T",
+        model_number_prefix: "RZ09-0483",
         name: "Razer Blade 16” (2023) Black",
         pid: 0x029f,
         features: &[
