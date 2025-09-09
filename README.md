@@ -9,10 +9,10 @@ A Windows application for controlling Razer Blade settings w/o Synapse.
 
 ## Features
 
-- Performance modes: Battery, Silent, Balanced, Performance, Hyperboost
-	- Custom is shown disabled; if active externally, it appears muted-green but remains non-clickable
+- Performance modes: Battery, Silent, Balanced, Performance, Hyperboost, Custom
+- Custom mode: CPU/GPU Low/Medium/High/Boost adjustments with experimental Undervolt option (no idea what it does as it's a preset)
 - Fan control: Auto/Manual, with current RPM display
-- Keyboard backlight: Brightness control
+- Keyboard backlight brightness control
 - Logo lighting: Static, Breathing, Off
 - Battery care: Toggle charging threshold (80%)
 
