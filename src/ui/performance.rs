@@ -18,7 +18,7 @@ const ORANGE_COLOR: Color32 = Color32::from_rgb(255, 165, 0);
 const CUSTOM_ACTIVE_FILL: Color32 = Color32::from_rgb(40, 80, 55);
 const CUSTOM_ACTIVE_STROKE: Color32 = Color32::from_rgb(70, 130, 90);
 
-/// Actions that can be triggered from the performance UI
+// Actions that can be triggered from the performance UI
 #[derive(Debug, Clone, PartialEq)]
 pub enum PerformanceAction {
     None,
@@ -28,18 +28,8 @@ pub enum PerformanceAction {
     SetGpuBoost(GpuBoost),
 }
 
-/// Renders the performance section UI
-/// 
-/// # Arguments
-/// * `ui` - The egui UI context
-/// * `current_performance_mode` - The currently active performance mode
-/// * `ac_power` - Whether the device is running on AC power
-/// * `device_model` - The device model name for conditional feature display
-/// * `gpu_models` - The list of GPU models for hardware-specific features
-/// * `available_modes` - The list of available performance modes for this device
-/// 
-/// # Returns
-/// The action requested by the user, if any
+// Renders the performance section UI
+
 pub fn render_performance_section(
     ui: &mut egui::Ui,
     current_performance_mode: &str,
@@ -68,7 +58,7 @@ pub fn render_performance_section(
         let show_custom_controls = current_performance_mode == "Custom" || show_probe_button; // reusing debug flag param
         if show_custom_controls {
             ui.add_space(6.0);
-            if let Some(custom_action) = render_custom_boosts(ui, ac_power, current_cpu_boost, current_gpu_boost, current_performance_mode == "Custom") {
+            if let Some(custom_action) = render_custom_boosts(ui, ac_power, current_cpu_boost, current_gpu_boost, current_performance_mode == "Custom", show_probe_button) {
                 action = custom_action;
             }
         }
@@ -84,23 +74,47 @@ fn render_custom_boosts(
     current_cpu: CpuBoost,
     current_gpu: GpuBoost,
     custom_active: bool,
+    debug_mode: bool,
 ) -> Option<PerformanceAction> {
     let mut out = None;
-    // CPU row
-    ui.horizontal(|ui| {
-        ui.add(egui::Label::new("CPU").selectable(false));
-        for boost in [CpuBoost::Low, CpuBoost::Medium, CpuBoost::High, CpuBoost::Boost] {
-            let label = format!("{:?}", boost);
+    // CPU row: left side label + standard boosts, right-aligned Undervolt (debug only)
+    let row_height = ui.spacing().interact_size.y;
+    let full_width = ui.available_width();
+    ui.allocate_ui_with_layout(egui::Vec2::new(full_width, row_height), Layout::right_to_left(Align::Center), |ui| {
+        // Right-most: Undervolt (debug)
+        if debug_mode {
+            let boost = CpuBoost::Undervolt;
+            let label = "Undervolt";
             let selected = boost == current_cpu;
             let color = get_button_color(ac_power, selected);
-            let mut btn = egui::Button::new(egui::RichText::new(&label).color(Color32::WHITE));
+            let mut btn = egui::Button::new(egui::RichText::new(label).color(Color32::WHITE));
             btn = btn
                 .fill(if selected { color } else { Color32::TRANSPARENT })
                 .stroke(egui::Stroke::new(1.0, color));
             let response = ui.add_enabled(custom_active, btn);
             if response.clicked() && !selected { out = Some(PerformanceAction::SetCpuBoost(boost)); }
-            if !custom_active { response.on_hover_text("Activate Custom mode to apply"); }
+            if !custom_active {
+                response.on_hover_text("Firmware preset (Undervolt). Behavior not fully understood; fixed internal setting. Activate Custom mode to apply.");
+            } else {
+                response.on_hover_text("Firmware preset (Undervolt). Behavior not fully understood; fixed internal setting.");
+            }
         }
+        // Left group: label + standard boosts
+        ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+            ui.add(egui::Label::new("CPU").selectable(false));
+            for boost in [CpuBoost::Low, CpuBoost::Medium, CpuBoost::High, CpuBoost::Boost] {
+                let label = format!("{:?}", boost);
+                let selected = boost == current_cpu;
+                let color = get_button_color(ac_power, selected);
+                let mut btn = egui::Button::new(egui::RichText::new(&label).color(Color32::WHITE));
+                btn = btn
+                    .fill(if selected { color } else { Color32::TRANSPARENT })
+                    .stroke(egui::Stroke::new(1.0, color));
+                let response = ui.add_enabled(custom_active, btn);
+                if response.clicked() && !selected { out = Some(PerformanceAction::SetCpuBoost(boost)); }
+                if !custom_active { response.on_hover_text("Activate Custom mode to apply"); }
+            }
+        });
     });
 
     // GPU row
@@ -123,7 +137,7 @@ fn render_custom_boosts(
     out
 }
 
-/// Renders the performance section header with power status
+// Renders the performance section header with power status
 fn render_performance_header(ui: &mut egui::Ui, ac_power: bool, show_probe_button: bool) {
     ui.horizontal(|ui| {
         ui.add(egui::Label::new("🚀 Performance Mode").selectable(false));
@@ -147,7 +161,7 @@ fn render_performance_header(ui: &mut egui::Ui, ac_power: bool, show_probe_butto
     });
 }
 
-/// Renders the performance mode selection buttons
+// Renders the performance mode selection buttons
 fn render_performance_modes(
     ui: &mut egui::Ui, 
     current_performance_mode: &str, 
@@ -230,7 +244,7 @@ fn render_performance_modes(
     action
 }
 
-/// Gets the appropriate button color based on power state and selection
+// Gets the appropriate button color based on power state and selection
 fn get_button_color(ac_power: bool, selected: bool) -> Color32 {
     match (ac_power, selected) {
         (true, true) => AC_SELECTED_COLOR,
@@ -240,7 +254,7 @@ fn get_button_color(ac_power: bool, selected: bool) -> Color32 {
     }
 }
 
-/// Renders power limits display and profile management controls
+// Renders power limits display and profile management controls
 fn render_power_limits_and_controls(
     ui: &mut egui::Ui, 
     current_performance_mode: &str, 
@@ -256,12 +270,10 @@ fn render_power_limits_and_controls(
             // For unsupported devices, show current mode only
             ui.add(egui::Label::new(format!("Mode: {}", current_performance_mode)).selectable(false));
         }
-        
-        // Profile management removed - using automatic AC/battery switching instead
     });
 }
 
-/// Displays the power limits for the current performance mode
+// Displays the power limits for the current performance mode
 fn render_power_limits_display(ui: &mut egui::Ui, current_performance_mode: &str) {
     let (cpu_power, gpu_power) = get_power_limits(current_performance_mode);
     
@@ -274,7 +286,7 @@ fn render_power_limits_display(ui: &mut egui::Ui, current_performance_mode: &str
     ui.add(egui::Label::new(display_text).selectable(false));
 }
 
-/// Gets the power limits for a given performance mode
+// Gets the power limits for a given performance mode
 fn get_power_limits(mode: &str) -> (u8, u16) {
     match mode {
         "Battery" => BATTERY_POWER_LIMITS,
@@ -286,8 +298,8 @@ fn get_power_limits(mode: &str) -> (u8, u16) {
     }
 }
 
-/// Determines if power limits should be displayed for this device configuration
-/// Only shows power limits for Razer Blade 16 2025 with RTX 5080 or 5090
+// Determines if power limits should be displayed for this device configuration
+// Only shows power limits for Razer Blade 16 2025 with RTX 5080 or 5090
 fn should_show_power_limits(device_model: &str, gpu_models: &[String]) -> bool {
     // Check if this is a Razer Blade 16 2025
     let is_blade_16_2025 = device_model.contains("Razer Blade 16") && device_model.contains("(2025)");
