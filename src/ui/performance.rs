@@ -1,5 +1,5 @@
 use eframe::egui::{self, Color32, Layout, Align, RichText};
-use librazer::types::PerfMode;
+use librazer::types::{PerfMode, CpuBoost, GpuBoost};
 
 // Constants for power limits per performance mode
 const BATTERY_POWER_LIMITS: (u8, u16) = (25, 40);
@@ -24,6 +24,8 @@ pub enum PerformanceAction {
     None,
     SetPerformanceMode(String),
     ToggleHidden,
+    SetCpuBoost(CpuBoost),
+    SetGpuBoost(GpuBoost),
 }
 
 /// Renders the performance section UI
@@ -47,6 +49,8 @@ pub fn render_performance_section(
     available_modes: &[PerfMode],
     base_modes: &[PerfMode],
     show_probe_button: bool,
+    current_cpu_boost: CpuBoost,
+    current_gpu_boost: GpuBoost,
 ) -> PerformanceAction {
     let mut action = PerformanceAction::None;
     
@@ -59,9 +63,64 @@ pub fn render_performance_section(
         
         // Power Limits and Profile Management (only for supported devices)
         render_power_limits_and_controls(ui, current_performance_mode, device_model, gpu_models, &mut action);
+
+        // Custom boost controls (visible when in Custom mode OR when debug flag enabled so UI can be tested)
+        let show_custom_controls = current_performance_mode == "Custom" || show_probe_button; // reusing debug flag param
+        if show_custom_controls {
+            ui.add_space(6.0);
+            if let Some(custom_action) = render_custom_boosts(ui, ac_power, current_cpu_boost, current_gpu_boost, current_performance_mode == "Custom") {
+                action = custom_action;
+            }
+        }
     });
     
     action
+}
+
+// Renders CPU / GPU boost selectors when Custom is active (or debug mode to preview UI)
+fn render_custom_boosts(
+    ui: &mut egui::Ui,
+    ac_power: bool,
+    current_cpu: CpuBoost,
+    current_gpu: GpuBoost,
+    custom_active: bool,
+) -> Option<PerformanceAction> {
+    let mut out = None;
+    // CPU row
+    ui.horizontal(|ui| {
+        ui.add(egui::Label::new("CPU").selectable(false));
+        for boost in [CpuBoost::Low, CpuBoost::Medium, CpuBoost::High, CpuBoost::Boost, CpuBoost::Undervolt] {
+            let label = format!("{:?}", boost);
+            let selected = boost == current_cpu;
+            let color = get_button_color(ac_power, selected);
+            let mut btn = egui::Button::new(egui::RichText::new(&label).color(Color32::WHITE));
+            btn = btn
+                .fill(if selected { color } else { Color32::TRANSPARENT })
+                .stroke(egui::Stroke::new(1.0, color));
+            let response = ui.add_enabled(custom_active, btn);
+            if response.clicked() && !selected { out = Some(PerformanceAction::SetCpuBoost(boost)); }
+            if !custom_active { response.on_hover_text("Activate Custom mode to apply"); }
+        }
+    });
+
+    // GPU row
+    ui.horizontal(|ui| {
+        ui.add(egui::Label::new("GPU").selectable(false));
+        for boost in [GpuBoost::Low, GpuBoost::Medium, GpuBoost::High] {
+            let label = format!("{:?}", boost);
+            let selected = boost == current_gpu;
+            let color = get_button_color(ac_power, selected);
+            let mut btn = egui::Button::new(egui::RichText::new(&label).color(Color32::WHITE));
+            btn = btn
+                .fill(if selected { color } else { Color32::TRANSPARENT })
+                .stroke(egui::Stroke::new(1.0, color));
+            let response = ui.add_enabled(custom_active, btn);
+            if response.clicked() && !selected { out = Some(PerformanceAction::SetGpuBoost(boost)); }
+            if !custom_active { response.on_hover_text("Activate Custom mode to apply"); }
+        }
+    });
+
+    out
 }
 
 /// Renders the performance section header with power status
@@ -148,23 +207,22 @@ fn render_performance_modes(
             }
         }
 
-        // Right-aligned Custom button via nested layout to avoid vertical centering issues
+        // Right-aligned Custom button
         if available_modes.contains(&PerfMode::Custom) {
             let width = ui.available_width();
-            let height = ui.spacing().interact_size.y; // ensure top alignment by giving explicit height
+            let height = ui.spacing().interact_size.y;
             ui.allocate_ui_with_layout(egui::Vec2::new(width, height), Layout::right_to_left(Align::Min), |ui| {
                 let custom_str = format!("{:?}", PerfMode::Custom);
-                let is_active_custom = current_performance_mode == custom_str;
-                let fill_color = if is_active_custom { CUSTOM_ACTIVE_FILL } else { Color32::from_gray(40) };
-                let stroke_color = if is_active_custom { CUSTOM_ACTIVE_STROKE } else { Color32::from_gray(80) };
-                let response = ui.add_enabled(
-                    false,
-                    egui::Button::new(&custom_str)
-                        .fill(fill_color)
-                        .stroke(egui::Stroke::new(1.0, stroke_color))
-                );
-                if is_active_custom { response.on_hover_text("Custom is active (set externally). Control disabled here"); }
-                else { response.on_hover_text("Custom mode not yet implemented"); }
+                let selected = current_performance_mode == custom_str;
+                let fill_color = if selected { CUSTOM_ACTIVE_FILL } else { Color32::TRANSPARENT };
+                let stroke_color = if selected { CUSTOM_ACTIVE_STROKE } else { Color32::from_gray(80) };
+                let btn = egui::Button::new(RichText::new(&custom_str).color(Color32::WHITE))
+                    .fill(fill_color)
+                    .stroke(egui::Stroke::new(1.0, stroke_color));
+                let response = ui.add(btn);
+                if response.clicked() && !selected { action = PerformanceAction::SetPerformanceMode(custom_str); }
+                if selected { response.on_hover_text("Custom mode active"); }
+                else { response.on_hover_text("Switch to Custom mode"); }
             });
         }
     });

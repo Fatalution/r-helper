@@ -1,4 +1,6 @@
-use eframe::egui::{self, Layout, Align};
+use eframe::egui::{self, Layout, Align, RichText};
+
+const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 use std::process::Command;
 
 /// Renders the application footer with version info and controls
@@ -30,7 +32,8 @@ pub fn render_footer(
 
 /// Renders the application version information
 fn render_version_info(ui: &mut egui::Ui) {
-    let label = egui::Label::new("Made with ♥ by Fatalution").selectable(false).sense(egui::Sense::click());
+    let text = format!("v{} • Made with ♥ by Fatalution", APP_VERSION);
+    let label = egui::Label::new(RichText::new(text)).selectable(false).sense(egui::Sense::click());
     if ui.add(label).clicked() {
         let _ = Command::new("cmd")
             .args(&["/c", "start", "https://paypal.me/fatalutionDE"])
