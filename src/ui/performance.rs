@@ -108,16 +108,18 @@ fn render_performance_modes(
             PerfMode::Hyperboost,
         ];
         
-        // Render main performance modes (active ones) in preferred order
-        let mut rendered: Vec<PerfMode> = Vec::new();
+    // Render main performance modes (active ones) in preferred order
         if ui.ctx().data(|d| d.get_temp::<bool>("perf_toggle_hidden".into()).unwrap_or(false)) {
             ui.ctx().data_mut(|d| d.remove::<bool>("perf_toggle_hidden".into()));
             action = PerformanceAction::ToggleHidden;
         }
-    let base_vec: Vec<PerfMode> = base_modes.iter().cloned().collect();
-    let showing_hidden = available_modes.iter().any(|m| !base_vec.contains(m));
+        let base_vec: Vec<PerfMode> = base_modes.iter().cloned().collect();
+        let showing_hidden = available_modes.iter().any(|m| !base_vec.contains(m));
+
+    // Left-aligned standard modes (exclude Custom)
+    let mut rendered: Vec<PerfMode> = Vec::new();
         for mode in &ordered_modes {
-            if available_modes.contains(mode) {
+            if available_modes.contains(mode) && *mode != PerfMode::Custom {
                 let mode_str = format!("{:?}", mode);
                 let selected = current_performance_mode == mode_str;
                 let button_color = get_button_color(ac_power, selected);
@@ -131,8 +133,6 @@ fn render_performance_modes(
                 rendered.push(*mode);
             }
         }
-        
-        // Render any additional modes not in our preferred order (e.g., future modes like Turbo)
         for mode in available_modes {
             if *mode != PerfMode::Custom && !rendered.contains(mode) {
                 let mode_str = format!("{:?}", mode);
@@ -147,30 +147,24 @@ fn render_performance_modes(
                 if is_hidden { response.on_hover_text("Hidden / unsupported by descriptor"); }
             }
         }
-        
-        // Add spacing before Custom mode
-        ui.add_space(20.0);
-        
-        // Render Custom mode on the right side (inactive)
+
+        // Use remaining width for right-aligned Custom button
         if available_modes.contains(&PerfMode::Custom) {
-            let custom_str = format!("{:?}", PerfMode::Custom);
-            let is_active_custom = current_performance_mode == custom_str;
-
-            let fill_color = if is_active_custom { CUSTOM_ACTIVE_FILL } else { Color32::from_gray(40) };
-            let stroke_color = if is_active_custom { CUSTOM_ACTIVE_STROKE } else { Color32::from_gray(80) };
-
-            let response = ui.add_enabled(
-                false, // keep non-interactive
-                egui::Button::new(&custom_str)
-                    .fill(fill_color)
-                    .stroke(egui::Stroke::new(1.0, stroke_color))
-            );
-
-            if is_active_custom {
-                response.on_hover_text("Custom is active (set externally). Control disabled here");
-            } else {
-                response.on_hover_text("Custom mode not yet implemented");
-            }
+            let avail = ui.available_width();
+            ui.allocate_ui_with_layout(egui::Vec2::new(avail, 0.0), Layout::right_to_left(Align::TOP), |ui| {
+                let custom_str = format!("{:?}", PerfMode::Custom);
+                let is_active_custom = current_performance_mode == custom_str;
+                let fill_color = if is_active_custom { CUSTOM_ACTIVE_FILL } else { Color32::from_gray(40) };
+                let stroke_color = if is_active_custom { CUSTOM_ACTIVE_STROKE } else { Color32::from_gray(80) };
+                let response = ui.add_enabled(
+                    false,
+                    egui::Button::new(&custom_str)
+                        .fill(fill_color)
+                        .stroke(egui::Stroke::new(1.0, stroke_color))
+                );
+                if is_active_custom { response.on_hover_text("Custom is active (set externally). Control disabled here"); }
+                else { response.on_hover_text("Custom mode not yet implemented"); }
+            });
         }
     });
     
