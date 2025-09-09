@@ -1146,7 +1146,7 @@ fn set_windows_app_id() {
     use windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID;
     use windows::core::PCWSTR;
     
-    let app_id = "RHelper.Application.0.3.2\0".encode_utf16().collect::<Vec<u16>>();
+    let app_id = "RHelper.Application.0.3.3\0".encode_utf16().collect::<Vec<u16>>();
     unsafe {
         let _ = SetCurrentProcessExplicitAppUserModelID(PCWSTR(app_id.as_ptr()));
     }
@@ -1169,7 +1169,7 @@ fn main() -> Result<(), eframe::Error> {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([450.0, initial_height])
             .with_resizable(false)
-            .with_title("R-Helper v0.3.2")
+            .with_title("R-Helper v0.3.3")
             .with_icon(load_icon())
             .with_always_on_top()
             .with_active(true),
@@ -1178,7 +1178,7 @@ fn main() -> Result<(), eframe::Error> {
 
     // Run the eframe app
     eframe::run_native(
-    "R-Helper v0.3.2",
+    "R-Helper v0.3.3",
         options,
         Box::new(move |cc| {
             // Schedule removal of always-on-top after a short delay
