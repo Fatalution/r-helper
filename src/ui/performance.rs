@@ -21,10 +21,9 @@ const CUSTOM_ACTIVE_STROKE: Color32 = Color32::from_rgb(70, 130, 90);
 /// Actions that can be triggered from the performance UI
 #[derive(Debug, Clone, PartialEq)]
 pub enum PerformanceAction {
-    /// No action requested
     None,
-    /// Set a specific performance mode
     SetPerformanceMode(String),
+    ToggleHidden,
 }
 
 /// Renders the performance section UI
@@ -46,15 +45,17 @@ pub fn render_performance_section(
     device_model: &str,
     gpu_models: &[String],
     available_modes: &[PerfMode],
+    base_modes: &[PerfMode],
+    show_probe_button: bool,
 ) -> PerformanceAction {
     let mut action = PerformanceAction::None;
     
     ui.group(|ui| {
-        render_performance_header(ui, ac_power);
+        render_performance_header(ui, ac_power, show_probe_button);
         ui.separator();
         
         // Performance Mode Selection
-    action = render_performance_modes(ui, current_performance_mode, ac_power, available_modes);
+    action = render_performance_modes(ui, current_performance_mode, ac_power, available_modes, base_modes);
         
         // Power Limits and Profile Management (only for supported devices)
         render_power_limits_and_controls(ui, current_performance_mode, device_model, gpu_models, &mut action);
@@ -64,7 +65,7 @@ pub fn render_performance_section(
 }
 
 /// Renders the performance section header with power status
-fn render_performance_header(ui: &mut egui::Ui, ac_power: bool) {
+fn render_performance_header(ui: &mut egui::Ui, ac_power: bool, show_probe_button: bool) {
     ui.horizontal(|ui| {
         ui.add(egui::Label::new("🚀 Performance Mode").selectable(false));
         
@@ -76,6 +77,11 @@ fn render_performance_header(ui: &mut egui::Ui, ac_power: bool) {
         };
         
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            if show_probe_button {
+                if ui.small_button("👁").on_hover_text("Show/Hide hidden modes").clicked() {
+                    ui.ctx().data_mut(|d| d.insert_temp("perf_toggle_hidden".into(), true));
+                }
+            }
             ui.add(egui::Label::new(RichText::new(power_icon).color(power_color)).selectable(false));
             ui.add(egui::Label::new(RichText::new(if ac_power { "AC Power" } else { "Battery" })).selectable(false));
         });
@@ -88,6 +94,7 @@ fn render_performance_modes(
     current_performance_mode: &str, 
     ac_power: bool,
     available_modes: &[PerfMode],
+    base_modes: &[PerfMode],
 ) -> PerformanceAction {
     let mut action = PerformanceAction::None;
     
@@ -101,68 +108,64 @@ fn render_performance_modes(
             PerfMode::Hyperboost,
         ];
         
-        // Render main performance modes (active ones) in preferred order
-        let mut rendered: Vec<PerfMode> = Vec::new();
+    // Render main performance modes (active ones) in preferred order
+        if ui.ctx().data(|d| d.get_temp::<bool>("perf_toggle_hidden".into()).unwrap_or(false)) {
+            ui.ctx().data_mut(|d| d.remove::<bool>("perf_toggle_hidden".into()));
+            action = PerformanceAction::ToggleHidden;
+        }
+        let base_vec: Vec<PerfMode> = base_modes.iter().cloned().collect();
+        let showing_hidden = available_modes.iter().any(|m| !base_vec.contains(m));
+
+    // Left-aligned standard modes (exclude Custom)
+    let mut rendered: Vec<PerfMode> = Vec::new();
         for mode in &ordered_modes {
-            if available_modes.contains(mode) {
+            if available_modes.contains(mode) && *mode != PerfMode::Custom {
                 let mode_str = format!("{:?}", mode);
                 let selected = current_performance_mode == mode_str;
                 let button_color = get_button_color(ac_power, selected);
-                
-                let response = ui.add(
-                    egui::Button::new(&mode_str)
-                        .fill(if selected { button_color } else { Color32::TRANSPARENT })
-                        .stroke(egui::Stroke::new(1.0, button_color))
-                );
-                
-                if response.clicked() && !selected {
-                    action = PerformanceAction::SetPerformanceMode(mode_str);
-                }
+                let is_hidden = showing_hidden && !base_vec.contains(mode);
+                let mut btn = egui::Button::new(RichText::new(&mode_str).color(if is_hidden && !selected { Color32::from_gray(160) } else { Color32::WHITE }));
+                btn = btn.fill(if selected { button_color } else { Color32::TRANSPARENT })
+                    .stroke(egui::Stroke::new(1.0, if is_hidden && !selected { Color32::from_gray(90) } else { button_color }));
+                let response = ui.add(btn);
+                if response.clicked() && !selected { action = PerformanceAction::SetPerformanceMode(mode_str); }
+                if is_hidden { response.on_hover_text("Hidden / unsupported by descriptor"); }
                 rendered.push(*mode);
             }
         }
-        
-        // Render any additional modes not in our preferred order (e.g., future modes like Turbo)
         for mode in available_modes {
             if *mode != PerfMode::Custom && !rendered.contains(mode) {
                 let mode_str = format!("{:?}", mode);
                 let selected = current_performance_mode == mode_str;
                 let button_color = get_button_color(ac_power, selected);
-
-                let response = ui.add(
-                    egui::Button::new(&mode_str)
-                        .fill(if selected { button_color } else { Color32::TRANSPARENT })
-                        .stroke(egui::Stroke::new(1.0, button_color))
-                );
-                if response.clicked() && !selected {
-                    action = PerformanceAction::SetPerformanceMode(mode_str);
-                }
+                let is_hidden = showing_hidden && !base_vec.contains(mode);
+                let mut btn = egui::Button::new(RichText::new(&mode_str).color(if is_hidden && !selected { Color32::from_gray(160) } else { Color32::WHITE }));
+                btn = btn.fill(if selected { button_color } else { Color32::TRANSPARENT })
+                    .stroke(egui::Stroke::new(1.0, if is_hidden && !selected { Color32::from_gray(90) } else { button_color }));
+                let response = ui.add(btn);
+                if response.clicked() && !selected { action = PerformanceAction::SetPerformanceMode(mode_str); }
+                if is_hidden { response.on_hover_text("Hidden / unsupported by descriptor"); }
             }
         }
-        
-        // Add spacing before Custom mode
-        ui.add_space(20.0);
-        
-        // Render Custom mode on the right side (inactive)
+
+        // Right-aligned Custom button via nested layout to avoid vertical centering issues
         if available_modes.contains(&PerfMode::Custom) {
-            let custom_str = format!("{:?}", PerfMode::Custom);
-            let is_active_custom = current_performance_mode == custom_str;
-
-            let fill_color = if is_active_custom { CUSTOM_ACTIVE_FILL } else { Color32::from_gray(40) };
-            let stroke_color = if is_active_custom { CUSTOM_ACTIVE_STROKE } else { Color32::from_gray(80) };
-
-            let response = ui.add_enabled(
-                false, // keep non-interactive
-                egui::Button::new(&custom_str)
-                    .fill(fill_color)
-                    .stroke(egui::Stroke::new(1.0, stroke_color))
-            );
-
-            if is_active_custom {
-                response.on_hover_text("Custom is active (set externally). Control disabled here");
-            } else {
-                response.on_hover_text("Custom mode not yet implemented");
-            }
+            let width = ui.available_width();
+            let height = ui.spacing().interact_size.y; // ensure top alignment by giving explicit height
+            ui.allocate_ui_with_layout(egui::Vec2::new(width, height), Layout::right_to_left(Align::Min), |ui| {
+                let custom_str = format!("{:?}", PerfMode::Custom);
+                let is_active_custom = current_performance_mode == custom_str;
+                let fill_color = if is_active_custom { CUSTOM_ACTIVE_FILL } else { Color32::from_gray(40) };
+                let stroke_color = if is_active_custom { CUSTOM_ACTIVE_STROKE } else { Color32::from_gray(80) };
+                let response = ui.add_enabled(
+                    false,
+                    egui::Button::new(&custom_str)
+                        .fill(fill_color)
+                        .stroke(egui::Stroke::new(1.0, stroke_color))
+                );
+                if is_active_custom { response.on_hover_text("Custom is active (set externally). Control disabled here"); }
+                else { response.on_hover_text("Custom mode not yet implemented"); }
+            });
         }
     });
     
