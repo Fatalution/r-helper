@@ -647,8 +647,6 @@ impl RazerGuiApp {
             ui,
             &self.status.performance_mode,
             self.ac_power,
-            &self.system_specs.device_model,
-            &self.system_specs.gpu_models,
             &self.available_performance_modes,
             &self.base_performance_modes,
             self.status_messages,
