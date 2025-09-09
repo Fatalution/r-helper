@@ -9,10 +9,9 @@ pub struct Descriptor {
     pub features: &'static [&'static str],
     pub init_cmds: &'static [u16],
 }
-
 pub const SUPPORTED: &[Descriptor] = &[
     Descriptor {
-        model_number_prefix: "RZ09-0483T",
+        model_number_prefix: "RZ09-0483",
         name: "Razer Blade 16” (2023) Black",
         pid: 0x029f,
         features: &[
@@ -26,7 +25,7 @@ pub const SUPPORTED: &[Descriptor] = &[
         init_cmds : &[],
     },
     Descriptor {
-        model_number_prefix: "RZ09-0482X",
+        model_number_prefix: "RZ09-0482",
         name: "Razer Blade 14” (2023) Mercury",
         pid: 0x029d,
         features: &[
@@ -81,7 +80,7 @@ pub const SUPPORTED: &[Descriptor] = &[
         init_cmds : &[0x0081,0x0086,0x0f90,0x0086,0x0f10,0x0087],
     },
     Descriptor {
-        model_number_prefix: "RZ09-0421N",
+        model_number_prefix: "RZ09-0421",
         name: "Razer Blade 15” (2022)",
         pid: 0x028a,
         features: &[
