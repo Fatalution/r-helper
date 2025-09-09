@@ -30,6 +30,7 @@ pub const SUPPORTED: &[Descriptor] = &[
             PerfMode::Battery,
             PerfMode::Silent,
             PerfMode::Balanced,
+            PerfMode::Custom,
         ]),
     },
     Descriptor {

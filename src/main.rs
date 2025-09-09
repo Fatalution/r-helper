@@ -64,6 +64,7 @@ struct RazerGuiApp {
     device_state: Option<CompleteDeviceState>,
     system_specs: SystemSpecs,
     available_performance_modes: Vec<PerfMode>,
+    base_performance_modes: Vec<PerfMode>,
     
     ac_power: bool,
     ac_profile: CompleteDeviceState,
@@ -86,7 +87,6 @@ struct RazerGuiApp {
     init_power_read: bool,
     init_specs_complete: bool,
     last_perf_poll_time: std::time::Instant,
-    probe_receiver: Option<mpsc::Receiver<Vec<PerfMode>>>,
 }
 
 impl RazerGuiApp {
@@ -168,6 +168,7 @@ impl RazerGuiApp {
             device_state: None,
             system_specs: SystemSpecs::default(),
             available_performance_modes: Vec::new(),
+            base_performance_modes: Vec::new(),
             ac_power: true,
             ac_profile,
             battery_profile,
@@ -190,7 +191,6 @@ impl RazerGuiApp {
             init_power_read: false,
             init_specs_complete: false,
             last_perf_poll_time: std::time::Instant::now(),
-            probe_receiver: None,
         };
         
         app.init_device();
@@ -220,10 +220,12 @@ impl RazerGuiApp {
         if let Some(ref device) = self.device {
             if let Some(list) = device.info().perf_modes {
                 self.available_performance_modes = list.to_vec();
+                if self.base_performance_modes.is_empty() { self.base_performance_modes = self.available_performance_modes.clone(); }
                 return;
             }
         }
         self.available_performance_modes = PerfMode::iter().collect();
+        if self.base_performance_modes.is_empty() { self.base_performance_modes = self.available_performance_modes.clone(); }
     }
     
     fn read_initial_device_state(&mut self) {
@@ -330,8 +332,7 @@ impl RazerGuiApp {
                         } else {
                             self.update_stored_device_state();
                             self.sync_ui_with_device_state();
-                            self.init_fan_slider_from_device();
-                            self.maybe_probe_perf_modes_async();
+                                self.init_fan_slider_from_device();
                         }
                     }
                 }
@@ -339,41 +340,7 @@ impl RazerGuiApp {
         }
     }
 
-    fn maybe_probe_perf_modes_async(&mut self) {
-        self.start_probe_perf_modes(false);
-    }
-
-    fn start_probe_perf_modes(&mut self, force: bool) {
-        let Some(ref device) = self.device else { return; };
-        if !force && device.info().perf_modes.is_some() { return; }
-        if let Ok((perf_mode, _)) = command::get_perf_mode(device) {
-            if matches!(perf_mode, PerfMode::Custom) { return; }
-        }
-        let (res_tx, res_rx) = std::sync::mpsc::channel::<Vec<PerfMode>>();
-        std::thread::spawn({
-            move || {
-                let mut modes = Vec::new();
-                if let Ok(dev) = Device::detect() {
-                    if let Ok((current_mode, _)) = command::get_perf_mode(&dev) {
-                        // Always include the currently reported mode
-                        modes.push(current_mode);
-                        for m in PerfMode::iter() {
-                            if m == current_mode { continue; }
-                            if command::set_perf_mode(&dev, m).is_ok() {
-                                // Confirm by reading back
-                                if let Ok((read_back, _)) = command::get_perf_mode(&dev) {
-                                    if read_back == m { modes.push(m); }
-                                }
-                            }
-                        }
-                        let _ = command::set_perf_mode(&dev, current_mode);
-                    }
-                }
-                let _ = res_tx.send(modes);
-            }
-        });
-        self.probe_receiver = Some(res_rx);
-    }
+    // probing removed
 }
 
 fn get_fan_rpm_actual(device: &Device, zone: librazer::types::FanZone) -> Option<u16> {
@@ -542,9 +509,8 @@ impl RazerGuiApp {
                     self.status.lights_always_on = matches!(current_state.lights_always_on, LightsAlwaysOn::Enable);
                     self.status.battery_care = matches!(current_state.battery_care, BatteryCare::Enable);
                     
-                    // Show specific change message
                     if old_perf_mode != new_perf_mode {
-                        self.set_status_message(format!("Performance mode changed externally: {} → {}", old_perf_mode, new_perf_mode));
+                        self.set_optional_status_message("Mode updated".to_string());
                     } else if self.status_messages {
                         self.set_optional_status_message("Device state updated externally".to_string());
                     }
@@ -687,7 +653,7 @@ impl RazerGuiApp {
                             }
                         }
                     }
-                    self.set_optional_status_message(format!("Performance mode set to {}", mode));
+                    self.set_optional_status_message("Mode changed".to_string());
                 },
                 Err(e) => {
                     self.set_error_message(format!("Failed to set performance mode: {}", e));
@@ -709,6 +675,7 @@ impl RazerGuiApp {
             &self.system_specs.device_model,
             &self.system_specs.gpu_models,
             &self.available_performance_modes,
+            &self.base_performance_modes,
             self.status_messages,
         );
         
@@ -717,9 +684,10 @@ impl RazerGuiApp {
             PerformanceAction::SetPerformanceMode(mode) => {
                 self.set_performance_mode(&mode);
             },
-            PerformanceAction::RefreshProbe => {
-                self.start_probe_perf_modes(true);
-            }
+                PerformanceAction::ToggleHidden => {
+                    let current = ui.ctx().data(|d| d.get_temp::<bool>("perf_hidden_show".into()).unwrap_or(false));
+                    ui.ctx().data_mut(|d| d.insert_temp("perf_hidden_show".into(), !current));
+                }
         }
     }
 
@@ -991,15 +959,11 @@ impl eframe::App for RazerGuiApp {
         // Process background initialization messages
         self.process_background_initialization();
 
-        // Check async perf-mode probe results
-        if let Some(rx) = &self.probe_receiver {
-            if let Ok(modes) = rx.try_recv() {
-                if !modes.is_empty() {
-                    self.available_performance_modes = modes;
-                    self.set_optional_status_message("Detected supported performance modes".to_string());
-                }
-                self.probe_receiver = None;
-            }
+        let hidden_on = ctx.data(|d| d.get_temp::<bool>("perf_hidden_show".into()).unwrap_or(false));
+        if hidden_on {
+            self.available_performance_modes = PerfMode::iter().collect();
+        } else {
+            self.detect_available_performance_modes();
         }
         
         // Update message manager
