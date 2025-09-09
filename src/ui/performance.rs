@@ -1,13 +1,6 @@
 use eframe::egui::{self, Color32, Layout, Align, RichText};
 use librazer::types::{PerfMode, CpuBoost, GpuBoost};
 
-// Constants for power limits per performance mode
-const BATTERY_POWER_LIMITS: (u8, u16) = (25, 40);
-const SILENT_POWER_LIMITS: (u8, u16) = (35, 110);
-const BALANCED_POWER_LIMITS: (u8, u16) = (45, 130);
-const PERFORMANCE_POWER_LIMITS: (u8, u16) = (65, 160);
-const HYPERBOOST_POWER_LIMITS: (u8, u16) = (65, 175);
-
 // Color constants for better maintainability
 const AC_SELECTED_COLOR: Color32 = Color32::from_rgb(0, 120, 60);
 const AC_UNSELECTED_COLOR: Color32 = Color32::from_rgb(60, 80, 40);
@@ -34,8 +27,6 @@ pub fn render_performance_section(
     ui: &mut egui::Ui,
     current_performance_mode: &str,
     ac_power: bool,
-    device_model: &str,
-    gpu_models: &[String],
     available_modes: &[PerfMode],
     base_modes: &[PerfMode],
     show_probe_button: bool,
@@ -49,11 +40,8 @@ pub fn render_performance_section(
         ui.separator();
         
         // Performance Mode Selection
-    action = render_performance_modes(ui, current_performance_mode, ac_power, available_modes, base_modes);
-        
-        // Power Limits and Profile Management (only for supported devices)
-        render_power_limits_and_controls(ui, current_performance_mode, device_model, gpu_models, &mut action);
-
+        action = render_performance_modes(ui, current_performance_mode, ac_power, available_modes, base_modes);
+            
         // Custom boost controls (visible when in Custom mode OR when debug flag enabled so UI can be tested)
         let show_custom_controls = current_performance_mode == "Custom" || show_probe_button; // reusing debug flag param
         if show_custom_controls {
@@ -63,7 +51,7 @@ pub fn render_performance_section(
             }
         }
     });
-    
+
     action
 }
 
@@ -252,66 +240,4 @@ fn get_button_color(ac_power: bool, selected: bool) -> Color32 {
         (false, true) => BATTERY_SELECTED_COLOR,
         (false, false) => BATTERY_UNSELECTED_COLOR,
     }
-}
-
-// Renders power limits display and profile management controls
-fn render_power_limits_and_controls(
-    ui: &mut egui::Ui, 
-    current_performance_mode: &str, 
-    device_model: &str,
-    gpu_models: &[String],
-    _action: &mut PerformanceAction
-) {
-    ui.horizontal(|ui| {
-        // Show CPU and GPU power limits only for supported devices
-        if should_show_power_limits(device_model, gpu_models) {
-            render_power_limits_display(ui, current_performance_mode);
-        } else {
-            // For unsupported devices, show current mode only
-            ui.add(egui::Label::new(format!("Mode: {}", current_performance_mode)).selectable(false));
-        }
-    });
-}
-
-// Displays the power limits for the current performance mode
-fn render_power_limits_display(ui: &mut egui::Ui, current_performance_mode: &str) {
-    let (cpu_power, gpu_power) = get_power_limits(current_performance_mode);
-    
-    let display_text = if cpu_power > 0 && gpu_power > 0 {
-        format!("CPU: {}W  |  GPU: {}W", cpu_power, gpu_power)
-    } else {
-        format!("Current: {}", current_performance_mode)
-    };
-    
-    ui.add(egui::Label::new(display_text).selectable(false));
-}
-
-// Gets the power limits for a given performance mode
-fn get_power_limits(mode: &str) -> (u8, u16) {
-    match mode {
-        "Battery" => BATTERY_POWER_LIMITS,
-        "Silent" => SILENT_POWER_LIMITS,
-        "Balanced" => BALANCED_POWER_LIMITS,
-        "Performance" => PERFORMANCE_POWER_LIMITS,
-        "Hyperboost" => HYPERBOOST_POWER_LIMITS,
-        _ => (0, 0), // Unknown mode
-    }
-}
-
-// Determines if power limits should be displayed for this device configuration
-// Only shows power limits for Razer Blade 16 2025 with RTX 5080 or 5090
-fn should_show_power_limits(device_model: &str, gpu_models: &[String]) -> bool {
-    // Check if this is a Razer Blade 16 2025
-    let is_blade_16_2025 = device_model.contains("Razer Blade 16") && device_model.contains("(2025)");
-    
-    if !is_blade_16_2025 {
-        return false;
-    }
-    
-    // Check if it has RTX 5080 or 5090
-    let has_supported_gpu = gpu_models.iter().any(|gpu| {
-        gpu.contains("RTX 5080") || gpu.contains("RTX 5090")
-    });
-    
-    has_supported_gpu
 }
