@@ -148,10 +148,11 @@ fn render_performance_modes(
             }
         }
 
-        // Use remaining width for right-aligned Custom button
+        // Right-aligned Custom button via nested layout to avoid vertical centering issues
         if available_modes.contains(&PerfMode::Custom) {
-            let avail = ui.available_width();
-            ui.allocate_ui_with_layout(egui::Vec2::new(avail, 0.0), Layout::right_to_left(Align::TOP), |ui| {
+            let width = ui.available_width();
+            let height = ui.spacing().interact_size.y; // ensure top alignment by giving explicit height
+            ui.allocate_ui_with_layout(egui::Vec2::new(width, height), Layout::right_to_left(Align::Min), |ui| {
                 let custom_str = format!("{:?}", PerfMode::Custom);
                 let is_active_custom = current_performance_mode == custom_str;
                 let fill_color = if is_active_custom { CUSTOM_ACTIVE_FILL } else { Color32::from_gray(40) };
