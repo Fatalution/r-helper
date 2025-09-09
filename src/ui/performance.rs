@@ -89,7 +89,7 @@ fn render_custom_boosts(
     // CPU row
     ui.horizontal(|ui| {
         ui.add(egui::Label::new("CPU").selectable(false));
-        for boost in [CpuBoost::Low, CpuBoost::Medium, CpuBoost::High, CpuBoost::Boost, CpuBoost::Undervolt] {
+        for boost in [CpuBoost::Low, CpuBoost::Medium, CpuBoost::High, CpuBoost::Boost] {
             let label = format!("{:?}", boost);
             let selected = boost == current_cpu;
             let color = get_button_color(ac_power, selected);
