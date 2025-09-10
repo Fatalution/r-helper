@@ -17,18 +17,6 @@ pub enum FanAction {
     SliderDragging(u16),
 }
 
-/// Renders the fan control section UI
-/// 
-/// # Arguments
-/// * `ui` - The egui UI context
-/// * `fan_speed` - The current fan speed mode string
-/// * `fan_actual_rpm` - The current actual fan RPM reading
-/// * `fan_set_rpm` - The current set fan RPM (what user configured)
-/// * `manual_fan_rpm` - Mutable reference to manual fan RPM setting
-/// * `show_status_messages` - Whether to show additional status information
-/// 
-/// # Returns
-/// The action requested by the user, if any
 pub fn render_fan_section(
     ui: &mut egui::Ui,
     fan_speed: &str,
@@ -36,15 +24,42 @@ pub fn render_fan_section(
     fan_set_rpm: Option<u16>,
     manual_fan_rpm: &mut u16,
     show_status_messages: bool,
-) -> FanAction {
+    custom_mode_active: bool,
+    max_fan_speed_enabled: bool,
+) -> (FanAction, bool) {
     let mut action = FanAction::None;
+    let mut toggle_max = max_fan_speed_enabled;
     
     ui.group(|ui| {
         render_fan_header(ui, fan_actual_rpm, fan_set_rpm, show_status_messages);
         ui.separator();
-        
-        // Fan Mode Selection
-        action = render_fan_mode_controls(ui, fan_speed, *manual_fan_rpm);
+        // Fan Mode Selection row with Max on the right
+        let available_width = ui.available_width();
+        ui.allocate_ui_with_layout(egui::Vec2::new(available_width, ui.spacing().interact_size.y), Layout::left_to_right(Align::Center), |ui| {
+            // Use two columns for clean right alignment
+            ui.columns(2, |cols| {
+                // Left column: Auto / Manual
+                cols[0].horizontal(|ui| {
+                    let auto_selected = fan_speed.eq_ignore_ascii_case("auto");
+                    if ui.selectable_label(auto_selected, "Auto").clicked() && !auto_selected { action = FanAction::SetAutoMode; }
+                    let manual_selected = fan_speed.eq_ignore_ascii_case("manual");
+                    if ui.selectable_label(manual_selected, "Manual").clicked() && !manual_selected { action = FanAction::SetManualMode(*manual_fan_rpm); }
+                });
+                // Right column: Max (toggle)
+                cols[1].with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    // Show when in Custom or debug (show_status_messages reused). Always reserves space in this column anyway.
+                    if custom_mode_active || show_status_messages {
+                        let max_selected = toggle_max;
+                        let response = ui.selectable_label(max_selected, "Max");
+                        if custom_mode_active {
+                            if response.clicked() { toggle_max = !toggle_max; }
+                        } else {
+                            response.on_hover_text("Activate Custom mode to enable Max");
+                        }
+                    }
+                });
+            });
+        });
         
         // Manual RPM Slider (shown only in manual mode)
         if fan_speed.eq_ignore_ascii_case("manual") {
@@ -56,7 +71,7 @@ pub fn render_fan_section(
         render_current_status(ui, fan_speed);
     });
     
-    action
+    (action, toggle_max)
 }
 
 fn render_fan_header(ui: &mut egui::Ui, fan_actual_rpm: Option<u16>, fan_set_rpm: Option<u16>, show_status_messages: bool) {
@@ -85,23 +100,7 @@ fn render_fan_header(ui: &mut egui::Ui, fan_actual_rpm: Option<u16>, fan_set_rpm
     });
 }
 
-fn render_fan_mode_controls(ui: &mut egui::Ui, fan_speed: &str, manual_fan_rpm: u16) -> FanAction {
-    let mut action = FanAction::None;
-    
-    ui.horizontal(|ui| {
-        let auto_selected = fan_speed.eq_ignore_ascii_case("auto");
-        if ui.selectable_label(auto_selected, "Auto").clicked() && !auto_selected {
-            action = FanAction::SetAutoMode;
-        }
-        
-        let manual_selected = fan_speed.eq_ignore_ascii_case("manual");
-        if ui.selectable_label(manual_selected, "Manual").clicked() && !manual_selected {
-            action = FanAction::SetManualMode(manual_fan_rpm);
-        }
-    });
-    
-    action
-}
+// (Removed old separate render_fan_mode_controls; integrated directly for alignment needs)
 
 fn render_manual_fan_controls(ui: &mut egui::Ui, manual_fan_rpm: &mut u16) -> Option<FanAction> {
     ui.horizontal(|ui| {

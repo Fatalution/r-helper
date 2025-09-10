@@ -12,7 +12,7 @@ pub struct Descriptor {
     pub perf_modes: Option<&'static [PerfMode]>,
 }
 pub const SUPPORTED: &[Descriptor] = &[
-        Descriptor {
+    Descriptor {
         model_number_prefix: "RZ09-0427",
         name: "Razer Blade 14” (2022)",
         pid: 0x028c,
@@ -47,7 +47,7 @@ pub const SUPPORTED: &[Descriptor] = &[
     init_cmds : &[],
     perf_modes: None,
     },
-        Descriptor {
+    Descriptor {
         model_number_prefix: "RZ09-0482",
         name: "Razer Blade 14” (2023)",
         pid: 0x029d,
