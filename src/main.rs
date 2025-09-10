@@ -1164,7 +1164,7 @@ fn main() -> Result<(), eframe::Error> {
             
             let mut app = RazerGuiApp::new();
             app.base_window_height = initial_height as f32;
-            Box::new(app)
+            Ok(Box::new(app))
         }),
     )
 }

@@ -10,20 +10,20 @@ name = "rhelper"
 path = "src/main.rs"
 
 [dependencies]
-eframe = "0.27"
-anyhow = "1.0.80"
+eframe = "0.32.2"
+anyhow = "1.0.89"
 librazer = { path = "./librazer" }
-image = "0.24"
-strum = { version = "0.26.1", features = ["derive"] }
+image = "0.25.8"
+strum = { version = "0.27.2", features = ["derive"] }
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.56.0", features = [
+windows = { version = "0.62.0", features = [
     "Win32_System_Power",
     "Win32_UI_Shell"
 ] }
 
 [build-dependencies]
-embed-resource = "2.4"
+embed-resource = "3.0.5"
 
 [workspace]
 resolver = "2"
