@@ -32,7 +32,7 @@ pub fn render_footer(
 
 /// Renders the application version information
 fn render_version_info(ui: &mut egui::Ui) {
-    let text = format!("v{} • Made with ♥ by Fatalution", APP_VERSION);
+    let text = format!("{} • Made with ♥ by Fatalution", APP_VERSION);
     let label = egui::Label::new(RichText::new(text)).selectable(false).sense(egui::Sense::click());
     if ui.add(label).clicked() {
         let _ = Command::new("cmd")
