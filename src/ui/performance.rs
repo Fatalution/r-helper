@@ -1,6 +1,7 @@
 use eframe::egui::{self, Color32, Layout, Align, RichText};
 use librazer::types::{PerfMode, CpuBoost, GpuBoost};
 
+
 // Color constants for better maintainability
 const AC_SELECTED_COLOR: Color32 = Color32::from_rgb(0, 120, 60);
 const AC_UNSELECTED_COLOR: Color32 = Color32::from_rgb(60, 80, 40);
@@ -38,7 +39,7 @@ pub fn render_performance_section(
     ui.group(|ui| {
         render_performance_header(ui, ac_power, show_probe_button);
         ui.separator();
-        
+      
         // Performance Mode Selection
         action = render_performance_modes(ui, current_performance_mode, ac_power, available_modes, base_modes);
             
