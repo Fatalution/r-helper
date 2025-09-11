@@ -15,6 +15,7 @@ pub fn render_header(
     system_specs: &SystemSpecs,
     device: &Option<Device>,
     message_manager: &MessageManager,
+    detecting_device: bool,
 ) {
     ui.horizontal(|ui| {
         // Device name
@@ -27,7 +28,7 @@ pub fn render_header(
             }
             
             // Status/warning messages
-            render_status_messages(ui, ctx, message_manager, device);
+            render_status_messages(ui, ctx, message_manager, device, detecting_device);
         });
     });
 }
@@ -53,6 +54,7 @@ fn render_status_messages(
     ctx: &egui::Context,
     message_manager: &MessageManager,
     device: &Option<Device>,
+    detecting_device: bool,
 ) {
     if let Some(current_message) = message_manager.get_current_message() {
         let elapsed = current_message.age_seconds();
@@ -71,7 +73,12 @@ fn render_status_messages(
     } else {
         // Show connection status when no device detected
         if device.is_none() {
-            ui.add(egui::Label::new(RichText::new("❌ No device detected").color(Color32::RED)).selectable(false));
+            if detecting_device {
+                ui.add(egui::Label::new(RichText::new("🔎 Detecting device…").color(Color32::LIGHT_BLUE)).selectable(false));
+                ctx.request_repaint();
+            } else {
+                ui.add(egui::Label::new(RichText::new("❌ No device detected").color(Color32::RED)).selectable(false));
+            }
         }
     }
 }

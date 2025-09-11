@@ -32,6 +32,7 @@ enum InitMessage {
     SystemSpecsComplete(SystemSpecs),
     PowerStateRead(bool),
     InitializationComplete,
+    DeviceDetectionComplete(bool),
 }
 
 #[derive(Debug, Clone)]
@@ -96,6 +97,10 @@ struct RazerGuiApp {
     base_window_height: f32,
     expanded_window_height: Option<f32>,
     custom_controls_visible_last: bool,
+    // Device detection state
+    detecting_device: bool,
+    device_detection_done: bool,
+    min_detecting_until: std::time::Instant,
 }
 
 impl RazerGuiApp {
@@ -161,6 +166,7 @@ impl RazerGuiApp {
         
         let (init_sender, init_receiver) = mpsc::channel();
         
+    let now = std::time::Instant::now();
     let mut app = Self {
             status: DeviceStatus::default(),
             device: None,
@@ -195,29 +201,32 @@ impl RazerGuiApp {
             base_window_height: 0.0,
             expanded_window_height: None,
             custom_controls_visible_last: false,
+            detecting_device: true,
+            device_detection_done: false,
+            min_detecting_until: now + std::time::Duration::from_secs(1),
         };
         
-        app.init_device();
+        // Kick off async device detection so the UI can show a clear “Detecting device…” state.
+        app.start_device_detection(init_sender.clone());
         
-        app.read_initial_device_state();
-        
+        // Start other background initialization (power state, system specs)
         app.start_background_initialization(init_sender);
         
         app
     }
 
-    fn init_device(&mut self) {
-    // Single detection attempt; UI will show an error if device missing.
-        match Device::detect() {
-            Ok(dev) => {
-                self.device = Some(dev);
-            }
-            Err(e) => {
-                self.set_error_message(format!("Failed to connect to Razer device: {}", e));
-            }
-        }
-        
-        self.detect_available_performance_modes();
+    fn start_device_detection(&mut self, sender: mpsc::Sender<InitMessage>) {
+        self.detecting_device = true;
+        std::thread::spawn(move || {
+            let present = match Device::detect() {
+                Ok(_dev) => true,
+                Err(e) => {
+                    eprintln!("Failed to connect to Razer device: {}", e);
+                    false
+                }
+            };
+            let _ = sender.send(InitMessage::DeviceDetectionComplete(present));
+        });
     }
 
     fn detect_available_performance_modes(&mut self) {
@@ -287,11 +296,8 @@ impl RazerGuiApp {
     }
     
     fn start_background_initialization(&mut self, sender: mpsc::Sender<InitMessage>) {
-        let device_name = if let Some(ref device) = self.device {
-            Some(device.info().name.to_string())
-        } else {
-            None
-        };
+    // Device may not be known yet; pass None here. We'll still display specs we can read.
+    let device_name: Option<String> = None;
 
         std::thread::spawn(move || {
             if let Ok(ac_power) = get_power_state() {
@@ -305,9 +311,7 @@ impl RazerGuiApp {
             let _ = sender.send(InitMessage::SystemSpecsComplete(system_specs));
         });
 
-        self.loading = false;
-
-        self.set_status_message("Initializing...".to_string());
+    self.loading = false;
     }
     
     fn process_background_initialization(&mut self) {
@@ -322,11 +326,35 @@ impl RazerGuiApp {
         
         for message in messages_to_process {
             match message {
+                InitMessage::DeviceDetectionComplete(present) => {
+                    self.device_detection_done = true;
+                    // If a device is found, switch immediately. If not, keep detecting until grace expires.
+                    if present {
+                        self.detecting_device = false;
+                    }
+                    if present {
+                        // Acquire the device on the UI thread.
+                        if let Ok(dev) = Device::detect() {
+                            self.device = Some(dev);
+                        }
+                    }
+                    self.detect_available_performance_modes();
+                    if self.device.is_some() {
+                        self.read_initial_device_state();
+                        // Now that the device is known, we can show a brief init message.
+                        self.set_status_message("Initializing...".to_string());
+                    }
+                }
                 InitMessage::SystemSpecsComplete(specs) => {
                     self.system_specs = specs;
                     self.init_specs_complete = true;
                     if self.fully_initialized && self.init_power_read && self.init_specs_complete {
-                        self.set_status_message("Initialization complete".to_string());
+                        // Avoid flashing a transient message on unsupported devices.
+                        if self.device.is_some() {
+                            self.set_status_message("Initialization complete".to_string());
+                        } else {
+                            self.set_optional_status_message("Initialization complete".to_string());
+                        }
                     } else {
                         self.set_optional_status_message("System specifications loaded".to_string());
                     }
@@ -950,10 +978,12 @@ impl eframe::App for RazerGuiApp {
         self.process_background_initialization();
 
         let hidden_on = ctx.data(|d| d.get_temp::<bool>("perf_hidden_show".into()).unwrap_or(false));
-        if hidden_on {
-            self.available_performance_modes = PerfMode::iter().collect();
-        } else {
-            self.detect_available_performance_modes();
+        if self.device.is_some() {
+            if hidden_on {
+                self.available_performance_modes = PerfMode::iter().collect();
+            } else {
+                self.detect_available_performance_modes();
+            }
         }
         
         self.message_manager.update();
@@ -991,7 +1021,7 @@ impl eframe::App for RazerGuiApp {
             return;
         }
 
-        // Only update when window is not minimized to save resources
+    // Only update when window is not minimized to save resources
         if !ctx.input(|i| i.viewport().minimized.unwrap_or(false)) {
             // Only do regular updates if fully initialized to avoid slow operations during startup
             if self.fully_initialized {
@@ -1030,12 +1060,14 @@ impl eframe::App for RazerGuiApp {
                         }
                         
                         self.sync_other_dynamic_state();
-                        if self.last_state_check_time.elapsed().as_secs_f32() >= 3.0 {
-                            if let Err(_e) = self.check_device_state_changes() {
-                                // Fallback: read full device status instead of minimal subset
-                                let _ = self.read_device_status();
+                        if self.device.is_some() {
+                            if self.last_state_check_time.elapsed().as_secs_f32() >= 3.0 {
+                                if let Err(_e) = self.check_device_state_changes() {
+                                    // Fallback: read full device status instead of minimal subset
+                                    let _ = self.read_device_status();
+                                }
+                                self.last_state_check_time = std::time::Instant::now();
                             }
-                            self.last_state_check_time = std::time::Instant::now();
                         }
                     }
                     
@@ -1043,6 +1075,12 @@ impl eframe::App for RazerGuiApp {
                 }
             } 
         } 
+        // Enforce a minimum detecting period before showing "No device detected"
+        if self.detecting_device && self.device.is_none() && self.device_detection_done {
+            if std::time::Instant::now() >= self.min_detecting_until {
+                self.detecting_device = false;
+            }
+        }
         // (clear_status_message_if_disabled removed)
         let footer_height = egui::TopBottomPanel::bottom("footer").show(ctx, |ui| {
             ui::footer::render_footer(ui, &mut self.status_messages);
@@ -1056,7 +1094,8 @@ impl eframe::App for RazerGuiApp {
                 self.loading, 
                 &self.system_specs,
                 &self.device,
-                &self.message_manager
+                &self.message_manager,
+                self.detecting_device,
             );
             ui.separator();
 
@@ -1072,7 +1111,7 @@ impl eframe::App for RazerGuiApp {
             self.render_battery_section(ui);
         });
         // Discrete height adjustment only when custom/debug controls appear or disappear
-        let custom_visible_now = self.status.performance_mode == "Custom" || self.status_messages;
+    let custom_visible_now = (self.device.is_some() && self.status.performance_mode == "Custom") || self.status_messages;
         if self.base_window_height == 0.0 {
             // Capture initial (non-custom) height once
             self.base_window_height = central_response.response.rect.height() + footer_height + 16.0;
@@ -1155,7 +1194,7 @@ fn main() -> Result<(), eframe::Error> {
     };
 
     eframe::run_native(
-    APP_NAME,
+        APP_NAME,
         options,
         Box::new(move |cc| {
             let ctx = cc.egui_ctx.clone();
@@ -1166,7 +1205,7 @@ fn main() -> Result<(), eframe::Error> {
             
             let mut app = RazerGuiApp::new();
             app.base_window_height = initial_height as f32;
-            Box::new(app)
+            Ok(Box::new(app))
         }),
     )
 }
