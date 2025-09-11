@@ -1145,6 +1145,8 @@ fn main() -> Result<(), eframe::Error> {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([450.0, initial_height])
             .with_resizable(false)
+            .with_maximize_button(false)
+            .with_fullscreen(false)
             .with_title(APP_NAME)
             .with_icon(load_icon())
             .with_always_on_top()
