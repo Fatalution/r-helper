@@ -2,12 +2,11 @@ use anyhow::{ensure, Result};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
-use bincode::{Encode, Decode};
 
 /// Packet is the structure of the packet that is sent to the Razer HID device and received back.
 /// Source https://github.com/Razer-Linux/razer-laptop-control-no-dkms/blob/main/razer_control_gui/src/device.rs.
 #[repr(C)]
-#[derive(Serialize, Deserialize, Debug, Encode, Decode)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Packet {
     status: u8,
     id: u8,
@@ -35,7 +34,7 @@ impl Packet {
 
         Packet {
             status: CommandStatus::New as u8,
-            id: rand::rng().random(),
+            id: rand::thread_rng().gen(),
             remaining_packets: 0x0000,
             protocol_type: 0x00,
             data_size: args.len() as u8,
@@ -86,7 +85,7 @@ impl Packet {
 
 impl From<&Packet> for Vec<u8> {
     fn from(packet: &Packet) -> Vec<u8> {
-    bincode::encode_to_vec(packet, bincode::config::standard()).unwrap()
+        bincode::serialize(packet).unwrap()
     }
 }
 
@@ -99,7 +98,6 @@ impl TryFrom<&[u8]> for Packet {
             "Invalid raw data size"
         );
 
-    let (decoded, _len): (Packet, usize) = bincode::decode_from_slice(data, bincode::config::standard())?;
-    Ok(decoded)
+        Ok(bincode::deserialize::<Packet>(data)?)
     }
 }
