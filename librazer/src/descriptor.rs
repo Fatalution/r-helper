@@ -48,6 +48,26 @@ pub const SUPPORTED: &[Descriptor] = &[
     perf_modes: None,
     },
     Descriptor {
+        model_number_prefix: "RZ09-0423",
+        name: "Razer Blade 17” (2022)",
+        pid: 0x028b,
+        features: &[
+            "battery-care",
+            "fan",
+            "kbd-backlight",
+            "lid-logo",
+            "lights-always-on",
+            "perf",
+        ],
+        init_cmds : &[],
+        perf_modes: Some(&[
+            PerfMode::Battery,
+            PerfMode::Silent,
+            PerfMode::Balanced,
+            PerfMode::Custom,
+        ]),
+    },
+    Descriptor {
         model_number_prefix: "RZ09-0482",
         name: "Razer Blade 14” (2023)",
         pid: 0x029d,
