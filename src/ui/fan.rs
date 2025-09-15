@@ -45,17 +45,12 @@ pub fn render_fan_section(
                     let manual_selected = fan_speed.eq_ignore_ascii_case("manual");
                     if ui.selectable_label(manual_selected, "Manual").clicked() && !manual_selected { action = FanAction::SetManualMode(*manual_fan_rpm); }
                 });
-                // Right column: Max (toggle)
+                // Right column: Max (toggle) - only when Custom mode AND in-app Debug are enabled
                 cols[1].with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    // Show when in Custom or debug (show_status_messages reused). Always reserves space in this column anyway.
-                    if custom_mode_active || show_status_messages {
+                    if custom_mode_active && show_status_messages {
                         let max_selected = toggle_max;
                         let response = ui.selectable_label(max_selected, "Max");
-                        if custom_mode_active {
-                            if response.clicked() { toggle_max = !toggle_max; }
-                        } else {
-                            response.on_hover_text("Activate Custom mode to enable Max");
-                        }
+                        if response.clicked() { toggle_max = !toggle_max; }
                     }
                 });
             });
