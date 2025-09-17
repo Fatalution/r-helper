@@ -93,56 +93,78 @@ fn render_custom_boosts(
     base_gpu: &[GpuBoost],
 ) -> Option<PerformanceAction> {
     let mut out = None;
-    // CPU row: left side label + standard boosts, right-aligned Undervolt (debug only)
+    // CPU row: left side label + standard boosts, right-aligned Undervolt (eye toggle only)
     let row_height = ui.spacing().interact_size.y;
     let full_width = ui.available_width();
-    ui.allocate_ui_with_layout(egui::Vec2::new(full_width, row_height), Layout::right_to_left(Align::Center), |ui| {
-        // Right-most: Undervolt (debug)
-        if debug_mode {
-            let boost = CpuBoost::Undervolt;
-            let label = "Undervolt";
-            let selected = boost == current_cpu;
-            let color = get_button_color(ac_power, selected);
-            let mut btn = egui::Button::new(egui::RichText::new(label).color(Color32::WHITE));
-            btn = btn
-                .fill(if selected { color } else { Color32::TRANSPARENT })
-                .stroke(egui::Stroke::new(1.0, color));
-            let response = ui.add_enabled(custom_active, btn);
-            if response.clicked() && !selected { out = Some(PerformanceAction::SetCpuBoost(boost)); }
-            if !custom_active {
-                response.on_hover_text("Firmware preset (Undervolt). Behavior not fully understood; fixed internal setting. Activate Custom mode to apply.");
-            } else {
-                response.on_hover_text("Firmware preset (Undervolt). Behavior not fully understood; fixed internal setting.");
-            }
-        }
-        // Left group: label + standard boosts
-        ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-            ui.add(egui::Label::new("CPU").selectable(false));
-            for boost in allowed_cpu.iter().copied() {
-                let label = format!("{:?}", boost);
+    ui.allocate_ui_with_layout(
+        egui::Vec2::new(full_width, row_height),
+        Layout::right_to_left(Align::Center),
+        |ui| {
+            // Right-most: Undervolt shown only when hidden boosts are revealed via eye toggle
+            let showing_hidden =
+                ui.ctx().data(|d| d.get_temp::<bool>("perf_hidden_show".into()).unwrap_or(false));
+            if showing_hidden {
+                let boost = CpuBoost::Undervolt;
+                let label = "Undervolt";
                 let selected = boost == current_cpu;
                 let color = get_button_color(ac_power, selected);
-                let mut btn = egui::Button::new(egui::RichText::new(&label).color(Color32::WHITE));
-                btn = btn
-                    .fill(if selected { color } else { Color32::TRANSPARENT })
-                    .stroke(egui::Stroke::new(1.0, color));
-                let invalid_combo = !debug_mode && disallowed_pairs.iter().any(|(c,g)| *c == boost && *g == current_gpu);
-                let is_extra = !base_cpu.contains(&boost);
-                if is_extra && !selected {
-                    // Dim & italicize extra (revealed) boosts
-                    btn = egui::Button::new(
-                        egui::RichText::new(&label).italics().color(Color32::from_gray(170)),
-                    )
-                    .fill(Color32::TRANSPARENT)
-                    .stroke(egui::Stroke::new(1.0, Color32::from_gray(90)));
+                let style_text = if selected {
+                    egui::RichText::new(label).color(Color32::WHITE)
+                } else {
+                    egui::RichText::new(label).italics().color(Color32::from_gray(170))
+                };
+                let mut btn = egui::Button::new(style_text);
+                btn = btn.fill(if selected { color } else { Color32::TRANSPARENT }).stroke(
+                    egui::Stroke::new(1.0, if selected { color } else { Color32::from_gray(90) }),
+                );
+                let response = ui.add_enabled(custom_active, btn);
+                if response.clicked() && !selected {
+                    out = Some(PerformanceAction::SetCpuBoost(boost));
                 }
-                let response = ui.add_enabled(custom_active && !invalid_combo, btn);
-                if response.clicked() && !selected { out = Some(PerformanceAction::SetCpuBoost(boost)); }
-                if !custom_active { response.on_hover_text("Activate Custom mode to apply"); }
-                else if invalid_combo { response.on_hover_text("Combination not allowed by firmware descriptor"); }
+                if !custom_active {
+                    response
+                        .on_hover_text("Hidden preset (Undervolt). Activate Custom mode to apply.");
+                } else {
+                    response
+                        .on_hover_text("Hidden preset (Undervolt). Behavior not fully confirmed.");
+                }
             }
-        });
-    });
+            // Left group: label + standard boosts
+            ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                ui.add(egui::Label::new("CPU").selectable(false));
+                for boost in allowed_cpu.iter().copied() {
+                    let label = format!("{:?}", boost);
+                    let selected = boost == current_cpu;
+                    let color = get_button_color(ac_power, selected);
+                    let mut btn =
+                        egui::Button::new(egui::RichText::new(&label).color(Color32::WHITE));
+                    btn = btn
+                        .fill(if selected { color } else { Color32::TRANSPARENT })
+                        .stroke(egui::Stroke::new(1.0, color));
+                    let invalid_combo = !debug_mode
+                        && disallowed_pairs.iter().any(|(c, g)| *c == boost && *g == current_gpu);
+                    let is_extra = !base_cpu.contains(&boost);
+                    if is_extra && !selected {
+                        // Dim & italicize extra (revealed) boosts
+                        btn = egui::Button::new(
+                            egui::RichText::new(&label).italics().color(Color32::from_gray(170)),
+                        )
+                        .fill(Color32::TRANSPARENT)
+                        .stroke(egui::Stroke::new(1.0, Color32::from_gray(90)));
+                    }
+                    let response = ui.add_enabled(custom_active && !invalid_combo, btn);
+                    if response.clicked() && !selected {
+                        out = Some(PerformanceAction::SetCpuBoost(boost));
+                    }
+                    if !custom_active {
+                        response.on_hover_text("Activate Custom mode to apply");
+                    } else if invalid_combo {
+                        response.on_hover_text("Combination not allowed by firmware descriptor");
+                    }
+                }
+            });
+        },
+    );
 
     // GPU row
     ui.horizontal(|ui| {
