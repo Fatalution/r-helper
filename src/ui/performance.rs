@@ -37,6 +37,7 @@ pub fn render_performance_section(
     disallowed_pairs: &[(CpuBoost, GpuBoost)],
     base_cpu_boosts: &[CpuBoost],
     base_gpu_boosts: &[GpuBoost],
+    no_device: bool,
 ) -> PerformanceAction {
     let mut action = PerformanceAction::None;
 
@@ -53,8 +54,14 @@ pub fn render_performance_section(
             base_modes,
         );
 
-        // Custom boost controls only when in Custom mode (debug no longer forces visibility)
-        let show_custom_controls = current_performance_mode == "Custom";
+        // Custom boost controls only when in Custom mode, UNLESS no device detected and hidden toggle used (discovery UX)
+        let showing_hidden =
+            ui.ctx().data(|d| d.get_temp::<bool>("perf_hidden_show".into()).unwrap_or(false));
+        let show_custom_controls = if no_device {
+            showing_hidden // allow exploration when no hardware
+        } else {
+            current_performance_mode == "Custom"
+        };
         if show_custom_controls {
             ui.add_space(6.0);
             if let Some(custom_action) = render_custom_boosts(

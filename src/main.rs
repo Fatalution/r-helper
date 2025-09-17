@@ -790,6 +790,7 @@ impl RazerGuiApp {
             &disallowed_pairs,
             &base_cpu,
             &base_gpu,
+            self.device.is_none(),
         );
 
         match action {
