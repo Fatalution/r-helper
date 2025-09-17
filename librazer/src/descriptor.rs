@@ -1,5 +1,5 @@
 use crate::feature;
-use crate::types::PerfMode;
+use crate::types::{PerfMode, CpuBoost, GpuBoost};
 
 // model_number_prefix shall conform to https://mysupport.razer.com/app/answers/detail/a_id/5481
 #[derive(Debug, Clone)]
@@ -9,7 +9,16 @@ pub struct Descriptor {
     pub pid: u16,
     pub features: &'static [&'static str],
     pub init_cmds: &'static [u16],
+
+    // Optional supported performance modes (if not listed, all visible)
     pub perf_modes: Option<&'static [PerfMode]>,
+    
+    // Optional supported CPU and GPU boost levels (if not listed, all visible)
+    pub cpu_boosts: Option<&'static [CpuBoost]>,
+    pub gpu_boosts: Option<&'static [GpuBoost]>,
+    
+    // Optional list of disallowed (CPU,GPU) boost combinations
+    pub disallowed_boost_pairs: Option<&'static [(CpuBoost, GpuBoost)]>,
 }
 pub const SUPPORTED: &[Descriptor] = &[
     Descriptor {
@@ -24,13 +33,16 @@ pub const SUPPORTED: &[Descriptor] = &[
             "lights-always-on",
             "perf",
         ],
-        init_cmds : &[],
+        init_cmds: &[],
         perf_modes: Some(&[
             PerfMode::Battery,
             PerfMode::Silent,
             PerfMode::Balanced,
             PerfMode::Custom,
         ]),
+        cpu_boosts: None,
+        gpu_boosts: None,
+        disallowed_boost_pairs: None,
     },
     Descriptor {
         model_number_prefix: "RZ09-0421",
@@ -44,8 +56,11 @@ pub const SUPPORTED: &[Descriptor] = &[
             "lights-always-on",
             "perf",
         ],
-    init_cmds : &[],
-    perf_modes: None,
+        init_cmds: &[],
+        perf_modes: None,
+        cpu_boosts: None,
+        gpu_boosts: None,
+        disallowed_boost_pairs: None,
     },
     Descriptor {
         model_number_prefix: "RZ09-0423",
@@ -59,13 +74,16 @@ pub const SUPPORTED: &[Descriptor] = &[
             "lights-always-on",
             "perf",
         ],
-        init_cmds : &[],
+        init_cmds: &[],
         perf_modes: Some(&[
             PerfMode::Battery,
             PerfMode::Silent,
             PerfMode::Balanced,
             PerfMode::Custom,
         ]),
+        cpu_boosts: None,
+        gpu_boosts: None,
+        disallowed_boost_pairs: None,
     },
     Descriptor {
         model_number_prefix: "RZ09-0482",
@@ -78,8 +96,11 @@ pub const SUPPORTED: &[Descriptor] = &[
             "lights-always-on",
             "perf",
         ],
-    init_cmds : &[],
-    perf_modes: None,
+        init_cmds: &[],
+        perf_modes: None,
+        cpu_boosts: None,
+        gpu_boosts: None,
+        disallowed_boost_pairs: None,
     },
     Descriptor {
         model_number_prefix: "RZ09-0483",
@@ -93,8 +114,11 @@ pub const SUPPORTED: &[Descriptor] = &[
             "lights-always-on",
             "perf",
         ],
-    init_cmds : &[],
-    perf_modes: None,
+        init_cmds: &[],
+        perf_modes: None,
+        cpu_boosts: None,
+        gpu_boosts: None,
+        disallowed_boost_pairs: None,
     },
     Descriptor {
         model_number_prefix: "RZ09-0528",
@@ -108,7 +132,7 @@ pub const SUPPORTED: &[Descriptor] = &[
             "lights-always-on",
             "perf",
         ],
-        init_cmds : &[0x0081,0x0086,0x0f90,0x0086,0x0f10,0x0087],
+        init_cmds: &[0x0081, 0x0086, 0x0f90, 0x0086, 0x0f10, 0x0087],
         perf_modes: Some(&[
             PerfMode::Battery,
             PerfMode::Silent,
@@ -117,7 +141,15 @@ pub const SUPPORTED: &[Descriptor] = &[
             PerfMode::Hyperboost,
             PerfMode::Custom,
         ]),
-    }
+        // Example restrictions: CPU Boost available, GPU High available, but cannot have both High simultaneously
+        cpu_boosts: Some(&[CpuBoost::Low, CpuBoost::Medium, CpuBoost::High]),
+        gpu_boosts: Some(&[GpuBoost::Low, GpuBoost::Medium, GpuBoost::High]),
+        disallowed_boost_pairs: Some(&[
+            (CpuBoost::High, GpuBoost::High),
+            (CpuBoost::Boost, GpuBoost::High),
+            (CpuBoost::High, GpuBoost::Medium), // sample extra constraints (adjust as needed)
+        ]),
+    },
 ];
 
 const _VALIDATE_FEATURES: () = {

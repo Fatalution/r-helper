@@ -30,24 +30,37 @@ pub fn render_performance_section(
     ac_power: bool,
     available_modes: &[PerfMode],
     base_modes: &[PerfMode],
-    show_probe_button: bool,
+    debug_mode: bool,
     current_cpu_boost: CpuBoost,
     current_gpu_boost: GpuBoost,
+    allowed_cpu_boosts: &[CpuBoost],
+    allowed_gpu_boosts: &[GpuBoost],
+    disallowed_pairs: &[(CpuBoost, GpuBoost)],
 ) -> PerformanceAction {
     let mut action = PerformanceAction::None;
     
     ui.group(|ui| {
-        render_performance_header(ui, ac_power, show_probe_button);
+    render_performance_header(ui, ac_power, debug_mode);
         ui.separator();
       
         // Performance Mode Selection
         action = render_performance_modes(ui, current_performance_mode, ac_power, available_modes, base_modes);
             
         // Custom boost controls (visible when in Custom mode OR when debug flag enabled so UI can be tested)
-        let show_custom_controls = current_performance_mode == "Custom" || show_probe_button; // reusing debug flag param
+        let show_custom_controls = current_performance_mode == "Custom" || debug_mode; // debug exposes UI always
         if show_custom_controls {
             ui.add_space(6.0);
-            if let Some(custom_action) = render_custom_boosts(ui, ac_power, current_cpu_boost, current_gpu_boost, current_performance_mode == "Custom", show_probe_button) {
+            if let Some(custom_action) = render_custom_boosts(
+                ui,
+                ac_power,
+                current_cpu_boost,
+                current_gpu_boost,
+                current_performance_mode == "Custom",
+                debug_mode,
+                allowed_cpu_boosts,
+                allowed_gpu_boosts,
+                disallowed_pairs,
+            ) {
                 action = custom_action;
             }
         }
@@ -64,6 +77,9 @@ fn render_custom_boosts(
     current_gpu: GpuBoost,
     custom_active: bool,
     debug_mode: bool,
+    allowed_cpu: &[CpuBoost],
+    allowed_gpu: &[GpuBoost],
+    disallowed_pairs: &[(CpuBoost, GpuBoost)],
 ) -> Option<PerformanceAction> {
     let mut out = None;
     // CPU row: left side label + standard boosts, right-aligned Undervolt (debug only)
@@ -91,7 +107,7 @@ fn render_custom_boosts(
         // Left group: label + standard boosts
         ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
             ui.add(egui::Label::new("CPU").selectable(false));
-            for boost in [CpuBoost::Low, CpuBoost::Medium, CpuBoost::High, CpuBoost::Boost] {
+            for boost in allowed_cpu.iter().copied() {
                 let label = format!("{:?}", boost);
                 let selected = boost == current_cpu;
                 let color = get_button_color(ac_power, selected);
@@ -99,9 +115,11 @@ fn render_custom_boosts(
                 btn = btn
                     .fill(if selected { color } else { Color32::TRANSPARENT })
                     .stroke(egui::Stroke::new(1.0, color));
-                let response = ui.add_enabled(custom_active, btn);
+                let invalid_combo = !debug_mode && disallowed_pairs.iter().any(|(c,g)| *c == boost && *g == current_gpu);
+                let response = ui.add_enabled(custom_active && !invalid_combo, btn);
                 if response.clicked() && !selected { out = Some(PerformanceAction::SetCpuBoost(boost)); }
                 if !custom_active { response.on_hover_text("Activate Custom mode to apply"); }
+                else if invalid_combo { response.on_hover_text("Combination not allowed by firmware descriptor"); }
             }
         });
     });
@@ -109,7 +127,7 @@ fn render_custom_boosts(
     // GPU row
     ui.horizontal(|ui| {
         ui.add(egui::Label::new("GPU").selectable(false));
-        for boost in [GpuBoost::Low, GpuBoost::Medium, GpuBoost::High] {
+        for boost in allowed_gpu.iter().copied() {
             let label = format!("{:?}", boost);
             let selected = boost == current_gpu;
             let color = get_button_color(ac_power, selected);
@@ -117,9 +135,11 @@ fn render_custom_boosts(
             btn = btn
                 .fill(if selected { color } else { Color32::TRANSPARENT })
                 .stroke(egui::Stroke::new(1.0, color));
-            let response = ui.add_enabled(custom_active, btn);
+            let invalid_combo = !debug_mode && disallowed_pairs.iter().any(|(c,g)| *c == current_cpu && *g == boost);
+            let response = ui.add_enabled(custom_active && !invalid_combo, btn);
             if response.clicked() && !selected { out = Some(PerformanceAction::SetGpuBoost(boost)); }
             if !custom_active { response.on_hover_text("Activate Custom mode to apply"); }
+            else if invalid_combo { response.on_hover_text("Combination not allowed by firmware descriptor"); }
         }
     });
 

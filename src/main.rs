@@ -241,6 +241,22 @@ impl RazerGuiApp {
         self.available_performance_modes = PerfMode::iter().collect();
         if self.base_performance_modes.is_empty() { self.base_performance_modes = self.available_performance_modes.clone(); }
     }
+
+    fn get_descriptor_allowed_boosts(&self) -> (Vec<CpuBoost>, Vec<GpuBoost>, Vec<(CpuBoost, GpuBoost)>) {
+        if let Some(ref device) = self.device {
+            let d = device.info();
+            let cpus: Vec<CpuBoost> = d.cpu_boosts.map(|s| s.to_vec()).unwrap_or_else(|| vec![CpuBoost::Low, CpuBoost::Medium, CpuBoost::High, CpuBoost::Boost]);
+            let gpus: Vec<GpuBoost> = d.gpu_boosts.map(|s| s.to_vec()).unwrap_or_else(|| vec![GpuBoost::Low, GpuBoost::Medium, GpuBoost::High]);
+            let pairs: Vec<(CpuBoost, GpuBoost)> = d.disallowed_boost_pairs.map(|p| p.to_vec()).unwrap_or_default();
+            (cpus, gpus, pairs)
+        } else {
+            (
+                vec![CpuBoost::Low, CpuBoost::Medium, CpuBoost::High, CpuBoost::Boost],
+                vec![GpuBoost::Low, GpuBoost::Medium, GpuBoost::High],
+                Vec::new(),
+            )
+        }
+    }
     
     fn read_initial_device_state(&mut self) {
         if let Some(ref device) = self.device {
@@ -666,16 +682,19 @@ impl RazerGuiApp {
 
     fn render_performance_section(&mut self, ui: &mut egui::Ui) {
         use ui::performance::{render_performance_section, PerformanceAction};
-        
+        let (allowed_cpu, allowed_gpu, disallowed_pairs) = self.get_descriptor_allowed_boosts();
         let action = render_performance_section(
             ui,
             &self.status.performance_mode,
             self.ac_power,
             &self.available_performance_modes,
             &self.base_performance_modes,
-            self.status_messages,
+            self.status_messages, // debug flag reuse
             self.cpu_boost,
             self.gpu_boost,
+            &allowed_cpu,
+            &allowed_gpu,
+            &disallowed_pairs,
         );
         
         match action {
