@@ -1,38 +1,38 @@
 // Utility functions shared across the app
 
-use std::process::Command;
 use anyhow::Result;
+use std::process::Command;
 
 pub use anyhow;
 
 // System Command Execution
 
 /// Execute a PowerShell script with consistent configuration
-/// 
+///
 /// This function provides a centralized way to execute PowerShell commands
 /// with proper error handling and consistent flags.
 #[cfg(target_os = "windows")]
 pub fn execute_powershell_command(script: &str) -> Result<String> {
     use std::os::windows::process::CommandExt;
-    
+
     let mut cmd = Command::new(POWERSHELL_PATH);
     cmd.args(&["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"])
-       .arg(script)
-       .creation_flags(CREATE_NO_WINDOW);
-    
+        .arg(script)
+        .creation_flags(CREATE_NO_WINDOW);
+
     match cmd.output() {
         Ok(output) => {
             let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
             let stderr_string = String::from_utf8_lossy(&output.stderr);
             let stderr = stderr_string.trim();
-            
+
             if !stderr.is_empty() && output.status.code() != Some(0) {
                 Err(anyhow::anyhow!("PowerShell error: {}", stderr))
             } else {
                 Ok(stdout)
             }
-        },
-        Err(e) => Err(anyhow::anyhow!("Failed to execute PowerShell: {}", e))
+        }
+        Err(e) => Err(anyhow::anyhow!("Failed to execute PowerShell: {}", e)),
     }
 }
 
@@ -87,12 +87,9 @@ pub struct DeviceStateReader<'a> {
 
 impl<'a> DeviceStateReader<'a> {
     pub fn new(device: &'a librazer::device::Device) -> Self {
-        Self {
-            device,
-            errors: Vec::new(),
-        }
+        Self { device, errors: Vec::new() }
     }
-    
+
     pub fn read<T, F>(&mut self, operation: F, operation_name: &str) -> Option<T>
     where
         F: FnOnce(&librazer::device::Device) -> Result<T>,
@@ -105,7 +102,7 @@ impl<'a> DeviceStateReader<'a> {
             }
         }
     }
-    
+
     pub fn finish(self) -> Vec<String> {
         self.errors
     }
@@ -120,4 +117,3 @@ pub const POWERSHELL_PATH: &str = "C:\\Windows\\System32\\WindowsPowerShell\\v1.
 /// Windows creation flag to hide console window
 #[cfg(target_os = "windows")]
 pub const CREATE_NO_WINDOW: u32 = 0x08000000;
-

@@ -14,14 +14,8 @@ fn _send_command(device: &Device, command: u16, args: &[u8]) -> Result<Packet> {
 }
 
 fn _set_perf_mode(device: &Device, perf_mode: PerfMode, fan_mode: FanMode) -> Result<()> {
-
     [1, 2].into_iter().try_for_each(|zone| {
-        _send_command(
-            device,
-            0x0d02,
-            &[0x01, zone, perf_mode as u8, fan_mode as u8],
-        )
-        .map(|_| ())
+        _send_command(device, 0x0d02, &[0x01, zone, perf_mode as u8, fan_mode as u8]).map(|_| ())
     })
 }
 
@@ -32,10 +26,7 @@ fn _set_boost(device: &Device, cluster: Cluster, boost: u8) -> Result<()> {
         "Performance mode must be {:?}",
         PerfMode::Custom
     );
-    ensure!(device
-        .send(Packet::new(0x0d07, args))?
-        .get_args()
-        .starts_with(args));
+    ensure!(device.send(Packet::new(0x0d07, args))?.get_args().starts_with(args));
     Ok(())
 }
 
@@ -99,11 +90,9 @@ pub fn set_fan_rpm(device: &Device, rpm: u16, check_mode: bool) -> Result<()> {
             FanMode::Manual
         );
     }
-    [FanZone::Zone1, FanZone::Zone2]
-        .into_iter()
-        .try_for_each(|zone| {
-            _send_command(device, 0x0d01, &[0, zone as u8, (rpm / 100) as u8]).map(|_| ())
-        })
+    [FanZone::Zone1, FanZone::Zone2].into_iter().try_for_each(|zone| {
+        _send_command(device, 0x0d01, &[0, zone as u8, (rpm / 100) as u8]).map(|_| ())
+    })
 }
 
 pub fn get_fan_rpm(device: &Device, fan_zone: FanZone) -> Result<u16> {
@@ -118,12 +107,10 @@ pub fn get_fan_actual_rpm(device: &Device, fan_zone: FanZone) -> Result<u16> {
     Ok(response.get_args()[2] as u16 * 100)
 }
 
-
 pub fn send_command(device: &Device, command: u16, args: &[u8]) -> Result<Packet> {
     let response = device.send(Packet::new(command, args))?;
     Ok(response)
 }
-
 
 pub fn set_max_fan_speed_mode(device: &Device, mode: MaxFanSpeedMode) -> Result<()> {
     ensure!(
@@ -205,10 +192,7 @@ pub fn get_keyboard_brightness(device: &Device) -> Result<u8> {
 
 pub fn set_keyboard_brightness(device: &Device, brightness: u8) -> Result<()> {
     let args = &[1, 5, brightness];
-    ensure!(device
-        .send(Packet::new(0x0303, args))?
-        .get_args()
-        .starts_with(args));
+    ensure!(device.send(Packet::new(0x0303, args))?.get_args().starts_with(args));
     Ok(())
 }
 
@@ -218,10 +202,7 @@ pub fn get_lights_always_on(device: &Device) -> Result<LightsAlwaysOn> {
 
 pub fn set_lights_always_on(device: &Device, lights_always_on: LightsAlwaysOn) -> Result<()> {
     let args = &[lights_always_on as u8, 0];
-    ensure!(device
-        .send(Packet::new(0x0004, args))?
-        .get_args()
-        .starts_with(args));
+    ensure!(device.send(Packet::new(0x0004, args))?.get_args().starts_with(args));
     Ok(())
 }
 
@@ -231,9 +212,6 @@ pub fn get_battery_care(device: &Device) -> Result<BatteryCare> {
 
 pub fn set_battery_care(device: &Device, mode: BatteryCare) -> Result<()> {
     let args = &[mode as u8];
-    ensure!(device
-        .send(Packet::new(0x0712, args))?
-        .get_args()
-        .starts_with(args));
+    ensure!(device.send(Packet::new(0x0712, args))?.get_args().starts_with(args));
     Ok(())
 }

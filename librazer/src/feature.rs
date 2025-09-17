@@ -63,11 +63,4 @@ pub const fn validate_features(features: &[&str]) {
     }}
 }
 
-feature_list![
-    BatteryCare,
-    LidLogo,
-    LightsAlwaysOn,
-    KbdBacklight,
-    Fan,
-    Perf,
-];
+feature_list![BatteryCare, LidLogo, LightsAlwaysOn, KbdBacklight, Fan, Perf,];

@@ -68,10 +68,7 @@ impl Packet {
             "Response command does not match the report"
         );
 
-        ensure!(
-            self.status != CommandStatus::NotSupported as u8,
-            "Command not supported"
-        );
+        ensure!(self.status != CommandStatus::NotSupported as u8, "Command not supported");
 
         ensure!(
             self.status == CommandStatus::Successful as u8,
@@ -93,10 +90,7 @@ impl TryFrom<&[u8]> for Packet {
     type Error = anyhow::Error;
 
     fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
-        ensure!(
-            data.len() == std::mem::size_of::<Packet>(),
-            "Invalid raw data size"
-        );
+        ensure!(data.len() == std::mem::size_of::<Packet>(), "Invalid raw data size");
 
         Ok(bincode::deserialize::<Packet>(data)?)
     }

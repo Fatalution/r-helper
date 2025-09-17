@@ -1,10 +1,10 @@
 #![windows_subsystem = "windows"]
 
-mod power;
 mod device;
-mod ui;
-mod system;
 mod messaging;
+mod power;
+mod system;
+mod ui;
 mod utils;
 
 use eframe::egui;
@@ -13,14 +13,16 @@ use egui::IconData;
 use anyhow::Result;
 use std::sync::mpsc;
 
-use librazer::types::{BatteryCare, LightsAlwaysOn, LogoMode, FanMode, PerfMode, CpuBoost, GpuBoost, MaxFanSpeedMode};
+use librazer::types::{
+    BatteryCare, CpuBoost, FanMode, GpuBoost, LightsAlwaysOn, LogoMode, MaxFanSpeedMode, PerfMode,
+};
 use librazer::{command, device::Device};
 use strum::IntoEnumIterator;
 
-use power::get_power_state;
 use device::CompleteDeviceState;
-use system::{SystemSpecs, get_system_specs};
-use messaging::{MessageManager, error_message, status_message};
+use messaging::{error_message, status_message, MessageManager};
+use power::get_power_state;
+use system::{get_system_specs, SystemSpecs};
 use utils::{execute_device_command_simple, DeviceStateReader};
 
 // Dynamic app metadata from Cargo
@@ -58,7 +60,6 @@ impl Default for DeviceStatus {
             keyboard_brightness: 0,
             lights_always_on: false,
             battery_care: true,
-            
         }
     }
 }
@@ -70,11 +71,11 @@ struct RazerGuiApp {
     system_specs: SystemSpecs,
     available_performance_modes: Vec<PerfMode>,
     base_performance_modes: Vec<PerfMode>,
-    
+
     ac_power: bool,
     ac_profile: CompleteDeviceState,
     battery_profile: CompleteDeviceState,
-    
+
     loading: bool,
     fully_initialized: bool,
     init_receiver: Option<mpsc::Receiver<InitMessage>>,
@@ -83,7 +84,7 @@ struct RazerGuiApp {
     last_state_check_time: std::time::Instant,
     last_fan_enforce_time: std::time::Instant,
     status_messages: bool,
-    
+
     manual_fan_rpm: u16,
     temp_brightness_step: usize,
     brightness_slider_active: bool,
@@ -107,11 +108,11 @@ impl RazerGuiApp {
     fn perf_mode_to_string(mode: PerfMode) -> String {
         format!("{:?}", mode)
     }
-    
+
     fn string_to_perf_mode(mode: &str) -> Option<PerfMode> {
         PerfMode::iter().find(|m| format!("{:?}", m) == mode)
     }
-    
+
     fn logo_mode_to_string(mode: LogoMode) -> &'static str {
         match mode {
             LogoMode::Static => "Static",
@@ -119,7 +120,7 @@ impl RazerGuiApp {
             LogoMode::Off => "Off",
         }
     }
-    
+
     fn string_to_logo_mode(mode: &str) -> Option<LogoMode> {
         match mode {
             "Static" => Some(LogoMode::Static),
@@ -128,16 +129,14 @@ impl RazerGuiApp {
             _ => None,
         }
     }
-    
+
     fn read_current_fan_state(device: &Device) -> (FanMode, Option<u16>) {
-    // Read the current fan mode from the combined perf/fan query.
-    // (We intentionally avoid a second immediate retry; caller logic tolerates fallback to Auto.)
-        let fan_mode = command::get_perf_mode(device)
-            .map(|(_, fm)| fm)
-            .unwrap_or_else(|_| {
-                eprintln!("Warning: Failed to read device fan mode, assuming Auto");
-                FanMode::Auto
-            });
+        // Read the current fan mode from the combined perf/fan query.
+        // (We intentionally avoid a second immediate retry; caller logic tolerates fallback to Auto.)
+        let fan_mode = command::get_perf_mode(device).map(|(_, fm)| fm).unwrap_or_else(|_| {
+            eprintln!("Warning: Failed to read device fan mode, assuming Auto");
+            FanMode::Auto
+        });
         let set_rpm = get_fan_rpm_set(device, librazer::types::FanZone::Zone1);
         (fan_mode, set_rpm)
     }
@@ -155,19 +154,17 @@ impl RazerGuiApp {
     fn set_no_device_message(&mut self) {
         self.set_status_message("No device connected".to_string());
     }
-    
+
     fn new() -> Self {
-    // Profiles kept in-memory so we can auto-switch on AC/Battery changes.
+        // Profiles kept in-memory so we can auto-switch on AC/Battery changes.
         let ac_profile = CompleteDeviceState::default();
-        let battery_profile = CompleteDeviceState {
-            perf_mode: PerfMode::Battery,
-            ..CompleteDeviceState::default()
-        };
-        
+        let battery_profile =
+            CompleteDeviceState { perf_mode: PerfMode::Battery, ..CompleteDeviceState::default() };
+
         let (init_sender, init_receiver) = mpsc::channel();
-        
-    let now = std::time::Instant::now();
-    let mut app = Self {
+
+        let now = std::time::Instant::now();
+        let mut app = Self {
             status: DeviceStatus::default(),
             device: None,
             device_state: None,
@@ -185,12 +182,11 @@ impl RazerGuiApp {
             last_state_check_time: std::time::Instant::now(),
             last_fan_enforce_time: std::time::Instant::now(),
             status_messages: false,
-            
-            
+
             manual_fan_rpm: 2000,
             temp_brightness_step: 0,
             brightness_slider_active: false,
-            
+
             should_quit: false,
 
             init_power_read: false,
@@ -205,13 +201,13 @@ impl RazerGuiApp {
             device_detection_done: false,
             min_detecting_until: now + std::time::Duration::from_secs(1),
         };
-        
+
         // Kick off async device detection so the UI can show a clear “Detecting device…” state.
         app.start_device_detection(init_sender.clone());
-        
+
         // Start other background initialization (power state, system specs)
         app.start_background_initialization(init_sender);
-        
+
         app
     }
 
@@ -230,24 +226,36 @@ impl RazerGuiApp {
     }
 
     fn detect_available_performance_modes(&mut self) {
-    // Prefer firmware-advertised list; fallback to full enum when unknown.
+        // Prefer firmware-advertised list; fallback to full enum when unknown.
         if let Some(ref device) = self.device {
             if let Some(list) = device.info().perf_modes {
                 self.available_performance_modes = list.to_vec();
-                if self.base_performance_modes.is_empty() { self.base_performance_modes = self.available_performance_modes.clone(); }
+                if self.base_performance_modes.is_empty() {
+                    self.base_performance_modes = self.available_performance_modes.clone();
+                }
                 return;
             }
         }
         self.available_performance_modes = PerfMode::iter().collect();
-        if self.base_performance_modes.is_empty() { self.base_performance_modes = self.available_performance_modes.clone(); }
+        if self.base_performance_modes.is_empty() {
+            self.base_performance_modes = self.available_performance_modes.clone();
+        }
     }
 
-    fn get_descriptor_allowed_boosts(&self) -> (Vec<CpuBoost>, Vec<GpuBoost>, Vec<(CpuBoost, GpuBoost)>) {
+    fn get_descriptor_allowed_boosts(
+        &self,
+    ) -> (Vec<CpuBoost>, Vec<GpuBoost>, Vec<(CpuBoost, GpuBoost)>) {
         if let Some(ref device) = self.device {
             let d = device.info();
-            let cpus: Vec<CpuBoost> = d.cpu_boosts.map(|s| s.to_vec()).unwrap_or_else(|| vec![CpuBoost::Low, CpuBoost::Medium, CpuBoost::High, CpuBoost::Boost]);
-            let gpus: Vec<GpuBoost> = d.gpu_boosts.map(|s| s.to_vec()).unwrap_or_else(|| vec![GpuBoost::Low, GpuBoost::Medium, GpuBoost::High]);
-            let pairs: Vec<(CpuBoost, GpuBoost)> = d.disallowed_boost_pairs.map(|p| p.to_vec()).unwrap_or_default();
+            let cpus: Vec<CpuBoost> = d.cpu_boosts.map(|s| s.to_vec()).unwrap_or_else(|| {
+                vec![CpuBoost::Low, CpuBoost::Medium, CpuBoost::High, CpuBoost::Boost]
+            });
+            let gpus: Vec<GpuBoost> = d
+                .gpu_boosts
+                .map(|s| s.to_vec())
+                .unwrap_or_else(|| vec![GpuBoost::Low, GpuBoost::Medium, GpuBoost::High]);
+            let pairs: Vec<(CpuBoost, GpuBoost)> =
+                d.disallowed_boost_pairs.map(|p| p.to_vec()).unwrap_or_default();
             (cpus, gpus, pairs)
         } else {
             (
@@ -257,63 +265,77 @@ impl RazerGuiApp {
             )
         }
     }
-    
+
     fn read_initial_device_state(&mut self) {
         if let Some(ref device) = self.device {
             let mut reader = DeviceStateReader::new(device);
             // Use batched reader helper to gather as much as possible without early abort.
-            
-            if let Some(brightness) = reader.read(|d| command::get_keyboard_brightness(d), "keyboard brightness") {
+
+            if let Some(brightness) =
+                reader.read(|d| command::get_keyboard_brightness(d), "keyboard brightness")
+            {
                 self.status.keyboard_brightness = brightness;
                 self.temp_brightness_step = ui::lighting::raw_brightness_to_step_index(brightness);
             }
-            
-            if let Some((perf_mode, fan_mode)) = reader.read(|d| command::get_perf_mode(d), "performance mode") {
+
+            if let Some((perf_mode, fan_mode)) =
+                reader.read(|d| command::get_perf_mode(d), "performance mode")
+            {
                 self.status.performance_mode = Self::perf_mode_to_string(perf_mode).to_string();
 
                 let (fan_speed, fan_rpm) = Self::get_fan_status_from_mode(fan_mode, device);
                 self.status.fan_speed = fan_speed;
                 self.status.fan_rpm = fan_rpm;
 
-                if let Some(rpm) = fan_rpm { self.manual_fan_rpm = rpm; }
+                if let Some(rpm) = fan_rpm {
+                    self.manual_fan_rpm = rpm;
+                }
 
                 if matches!(perf_mode, PerfMode::Custom) {
-                    if let Ok(v) = command::get_cpu_boost(device) { self.cpu_boost = v; }
-                    if let Ok(v) = command::get_gpu_boost(device) { self.gpu_boost = v; }
+                    if let Ok(v) = command::get_cpu_boost(device) {
+                        self.cpu_boost = v;
+                    }
+                    if let Ok(v) = command::get_gpu_boost(device) {
+                        self.gpu_boost = v;
+                    }
                 }
             }
-            
+
             if self.status.fan_speed == "Reading..." {
                 // Fallback: if earlier combined call failed but later succeeds, fill fan info.
                 if let Ok((_, fan_mode)) = command::get_perf_mode(device) {
                     let (fan_speed, fan_rpm) = Self::get_fan_status_from_mode(fan_mode, device);
                     self.status.fan_speed = fan_speed;
                     self.status.fan_rpm = fan_rpm;
-                    
+
                     if let Some(rpm) = fan_rpm {
                         self.manual_fan_rpm = rpm;
                     }
                 }
             }
-            
-            if let Some(lights_always_on) = reader.read(|d| command::get_lights_always_on(d), "lights always on") {
+
+            if let Some(lights_always_on) =
+                reader.read(|d| command::get_lights_always_on(d), "lights always on")
+            {
                 self.status.lights_always_on = matches!(lights_always_on, LightsAlwaysOn::Enable);
             }
-            
-            if let Some(battery_care) = reader.read(|d| command::get_battery_care(d), "battery care") {
+
+            if let Some(battery_care) =
+                reader.read(|d| command::get_battery_care(d), "battery care")
+            {
                 self.status.battery_care = matches!(battery_care, BatteryCare::Enable);
             }
-            
+
             let errors = reader.finish();
             if !errors.is_empty() && cfg!(debug_assertions) {
                 eprintln!("Device state reading errors: {:?}", errors);
             }
         }
     }
-    
+
     fn start_background_initialization(&mut self, sender: mpsc::Sender<InitMessage>) {
-    // Device may not be known yet; pass None here. We'll still display specs we can read.
-    let device_name: Option<String> = None;
+        // Device may not be known yet; pass None here. We'll still display specs we can read.
+        let device_name: Option<String> = None;
 
         std::thread::spawn(move || {
             if let Ok(ac_power) = get_power_state() {
@@ -327,19 +349,19 @@ impl RazerGuiApp {
             let _ = sender.send(InitMessage::SystemSpecsComplete(system_specs));
         });
 
-    self.loading = false;
+        self.loading = false;
     }
-    
+
     fn process_background_initialization(&mut self) {
         let mut messages_to_process = Vec::new();
-    // Drain all pending init messages this frame (non-blocking).
-        
+        // Drain all pending init messages this frame (non-blocking).
+
         if let Some(ref receiver) = self.init_receiver {
             while let Ok(message) = receiver.try_recv() {
                 messages_to_process.push(message);
             }
         }
-        
+
         for message in messages_to_process {
             match message {
                 InitMessage::DeviceDetectionComplete(present) => {
@@ -372,7 +394,9 @@ impl RazerGuiApp {
                             self.set_optional_status_message("Initialization complete".to_string());
                         }
                     } else {
-                        self.set_optional_status_message("System specifications loaded".to_string());
+                        self.set_optional_status_message(
+                            "System specifications loaded".to_string(),
+                        );
                     }
                 }
                 InitMessage::PowerStateRead(ac_power) => {
@@ -387,7 +411,7 @@ impl RazerGuiApp {
                         } else {
                             self.update_stored_device_state();
                             self.sync_ui_with_device_state();
-                                self.init_fan_slider_from_device();
+                            self.init_fan_slider_from_device();
                         }
                     }
                 }
@@ -411,10 +435,9 @@ fn get_fan_rpm_set(device: &Device, zone: librazer::types::FanZone) -> Option<u1
 }
 
 impl RazerGuiApp {
-
     fn read_device_status(&mut self) -> Result<()> {
-    let device = self.device.as_ref().unwrap();
-    // Core perf + fan query (single device round-trip).
+        let device = self.device.as_ref().unwrap();
+        // Core perf + fan query (single device round-trip).
         let (perf_mode, fan_mode) = command::get_perf_mode(device)?;
         self.status.performance_mode = Self::perf_mode_to_string(perf_mode).to_string();
         let (fan_speed, fan_rpm) = Self::get_fan_status_from_mode(fan_mode, device);
@@ -450,14 +473,17 @@ impl RazerGuiApp {
             if !self.brightness_slider_active {
                 if let Ok(brightness) = command::get_keyboard_brightness(device) {
                     self.status.keyboard_brightness = brightness;
-                    self.temp_brightness_step = ui::lighting::raw_brightness_to_step_index(brightness);
+                    self.temp_brightness_step =
+                        ui::lighting::raw_brightness_to_step_index(brightness);
                 }
             }
             let (fan_mode, set_rpm) = Self::read_current_fan_state(device);
             let (fan_speed, fan_rpm) = Self::get_fan_status_from_mode(fan_mode, device);
             self.status.fan_speed = fan_speed;
             self.status.fan_rpm = fan_rpm;
-            if let Some(rpm) = set_rpm { self.manual_fan_rpm = rpm; }
+            if let Some(rpm) = set_rpm {
+                self.manual_fan_rpm = rpm;
+            }
             if let Ok(lights_always_on) = command::get_lights_always_on(device) {
                 self.status.lights_always_on = matches!(lights_always_on, LightsAlwaysOn::Enable);
             }
@@ -486,7 +512,9 @@ impl RazerGuiApp {
             let (fan_speed, fan_rpm) = Self::get_fan_status_from_mode(fan_mode, device);
             self.status.fan_speed = fan_speed;
             self.status.fan_rpm = fan_rpm;
-            if let Some(rpm) = set_rpm { self.manual_fan_rpm = rpm; }
+            if let Some(rpm) = set_rpm {
+                self.manual_fan_rpm = rpm;
+            }
         }
     }
 
@@ -494,37 +522,45 @@ impl RazerGuiApp {
         if let Some(ref device) = self.device {
             // Full snapshot comparison to detect external changes.
             let current_state = CompleteDeviceState::read_from_device(device)?;
-            
+
             if let Some(ref stored_state) = self.device_state {
                 if current_state != *stored_state {
-                    
                     let old_perf_mode = Self::perf_mode_to_string(stored_state.perf_mode);
                     let new_perf_mode = Self::perf_mode_to_string(current_state.perf_mode);
-                    
+
                     self.device_state = Some(current_state.clone());
-                    
+
                     // Convert the low-level state to our UI format
-                    self.status.performance_mode = Self::perf_mode_to_string(current_state.perf_mode).to_string();
-                    
-                    let (fan_speed, fan_rpm) = Self::get_fan_status_from_mode(current_state.fan_mode, device);
+                    self.status.performance_mode =
+                        Self::perf_mode_to_string(current_state.perf_mode).to_string();
+
+                    let (fan_speed, fan_rpm) =
+                        Self::get_fan_status_from_mode(current_state.fan_mode, device);
                     self.status.fan_speed = fan_speed;
                     self.status.fan_rpm = fan_rpm;
                     if let Some(rpm) = fan_rpm {
                         self.manual_fan_rpm = rpm;
                     }
-                    
-                    self.status.logo_mode = Self::logo_mode_to_string(current_state.logo_mode).to_string();
-                    
+
+                    self.status.logo_mode =
+                        Self::logo_mode_to_string(current_state.logo_mode).to_string();
+
                     self.status.keyboard_brightness = current_state.keyboard_brightness;
-                    self.temp_brightness_step = ui::lighting::raw_brightness_to_step_index(current_state.keyboard_brightness);
-                    
-                    self.status.lights_always_on = matches!(current_state.lights_always_on, LightsAlwaysOn::Enable);
-                    self.status.battery_care = matches!(current_state.battery_care, BatteryCare::Enable);
-                    
+                    self.temp_brightness_step = ui::lighting::raw_brightness_to_step_index(
+                        current_state.keyboard_brightness,
+                    );
+
+                    self.status.lights_always_on =
+                        matches!(current_state.lights_always_on, LightsAlwaysOn::Enable);
+                    self.status.battery_care =
+                        matches!(current_state.battery_care, BatteryCare::Enable);
+
                     if old_perf_mode != new_perf_mode {
                         self.set_optional_status_message("Mode updated".to_string());
                     } else if self.status_messages {
-                        self.set_optional_status_message("Device state updated externally".to_string());
+                        self.set_optional_status_message(
+                            "Device state updated externally".to_string(),
+                        );
                     }
                 }
             } else {
@@ -548,7 +584,6 @@ impl RazerGuiApp {
         self.message_manager.add_message(error_message(message));
     }
 
-
     fn update_stored_device_state(&mut self) {
         if let Some(ref device) = self.device {
             if let Ok(current_state) = CompleteDeviceState::read_from_device(device) {
@@ -560,24 +595,25 @@ impl RazerGuiApp {
     fn auto_switch_profile(&mut self) {
         if let Some(ref device) = self.device {
             // Choose which saved profile to apply based on current AC state.
-            let target_profile = if self.ac_power {
-                self.ac_profile.clone()
-            } else {
-                self.battery_profile.clone()
-            };
-            
+            let target_profile =
+                if self.ac_power { self.ac_profile.clone() } else { self.battery_profile.clone() };
+
             let profile_name = if self.ac_power { "AC" } else { "Battery" };
-            
+
             if let Err(e) = command::set_perf_mode(device, target_profile.perf_mode) {
-                self.set_error_message(format!("Failed to switch to {} profile: {}", profile_name, e));
+                self.set_error_message(format!(
+                    "Failed to switch to {} profile: {}",
+                    profile_name, e
+                ));
                 return;
             }
-            
-            self.status.performance_mode = Self::perf_mode_to_string(target_profile.perf_mode).to_string();
-            
+
+            self.status.performance_mode =
+                Self::perf_mode_to_string(target_profile.perf_mode).to_string();
+
             self.set_status_message(format!("⚡ Auto-switched to {} profile", profile_name));
         }
-        
+
         // Read current device state to preserve user settings
         if let Err(_) = self.read_device_status() {
             // If we can't read device status, try to apply minimal fallback
@@ -587,23 +623,23 @@ impl RazerGuiApp {
                 } else {
                     self.battery_profile.clone()
                 };
-                
+
                 if let Err(e) = self.apply_profile(device, &target_profile) {
                     self.set_error_message(format!("Failed to apply fallback profile: {}", e));
                 }
             }
         }
-        
+
         self.update_stored_device_state();
-        
+
         self.sync_ui_with_device_state();
     }
 
     fn apply_profile(&self, device: &Device, profile: &CompleteDeviceState) -> Result<()> {
         command::set_perf_mode(device, profile.perf_mode)?;
-        
+
         command::set_logo_mode(device, profile.logo_mode)?;
-        
+
         if let Ok(current_brightness) = command::get_keyboard_brightness(device) {
             if current_brightness != profile.keyboard_brightness {
                 command::set_keyboard_brightness(device, profile.keyboard_brightness)?;
@@ -611,16 +647,19 @@ impl RazerGuiApp {
         } else {
             command::set_keyboard_brightness(device, profile.keyboard_brightness)?;
         }
-        
+
         command::set_lights_always_on(device, profile.lights_always_on)?;
-        
+
         command::set_battery_care(device, profile.battery_care)?;
-        
+
         Ok(())
     }
 
     fn set_performance_mode(&mut self, mode: &str) {
-        let perf_mode = match Self::string_to_perf_mode(mode) { Some(m) => m, None => return };
+        let perf_mode = match Self::string_to_perf_mode(mode) {
+            Some(m) => m,
+            None => return,
+        };
 
         let mut restore_manual = None::<u16>;
         let mut read_boosts = false;
@@ -634,11 +673,17 @@ impl RazerGuiApp {
                 Ok(_) => {
                     set_mode_ok = true;
                     // Preserve manual fan RPM if user had manual mode before switching.
-                    if matches!(current_fan_mode, FanMode::Manual) { restore_manual = set_rpm; }
+                    if matches!(current_fan_mode, FanMode::Manual) {
+                        restore_manual = set_rpm;
+                    }
                     // Only query boost states for Custom (other modes ignore those values).
-                    if mode == "Custom" { read_boosts = true; }
+                    if mode == "Custom" {
+                        read_boosts = true;
+                    }
                 }
-                Err(e) => { error_msg = Some(format!("Failed to set performance mode: {}", e)); }
+                Err(e) => {
+                    error_msg = Some(format!("Failed to set performance mode: {}", e));
+                }
             }
 
             if set_mode_ok {
@@ -648,18 +693,27 @@ impl RazerGuiApp {
                     if command::set_fan_mode(device, FanMode::Manual).is_ok() {
                         std::thread::sleep(std::time::Duration::from_millis(50));
                         if command::set_fan_rpm(device, rpm, true).is_err() {
-                            error_msg = Some("Failed to restore fan RPM after performance mode change".into());
+                            error_msg = Some(
+                                "Failed to restore fan RPM after performance mode change".into(),
+                            );
                         } else {
                             restore_manual = Some(rpm);
                         }
                     } else {
-                        error_msg = Some("Failed to restore manual fan mode after performance mode change".into());
+                        error_msg = Some(
+                            "Failed to restore manual fan mode after performance mode change"
+                                .into(),
+                        );
                     }
                 }
                 if read_boosts {
                     // Populate boost controls so UI reflects actual device values.
-                    if let Ok(v) = command::get_cpu_boost(device) { self.cpu_boost = v; }
-                    if let Ok(v) = command::get_gpu_boost(device) { self.gpu_boost = v; }
+                    if let Ok(v) = command::get_cpu_boost(device) {
+                        self.cpu_boost = v;
+                    }
+                    if let Ok(v) = command::get_gpu_boost(device) {
+                        self.gpu_boost = v;
+                    }
                 }
             }
         } else {
@@ -667,7 +721,9 @@ impl RazerGuiApp {
             return;
         }
 
-        if let Some(msg) = error_msg { self.set_error_message(msg); }
+        if let Some(msg) = error_msg {
+            self.set_error_message(msg);
+        }
         if set_mode_ok {
             self.status.performance_mode = mode.to_string();
             if let Some(rpm) = restore_manual {
@@ -696,16 +752,18 @@ impl RazerGuiApp {
             &allowed_gpu,
             &disallowed_pairs,
         );
-        
+
         match action {
-            PerformanceAction::None => {},
+            PerformanceAction::None => {}
             PerformanceAction::SetPerformanceMode(mode) => {
                 self.set_performance_mode(&mode);
-            },
+            }
             PerformanceAction::ToggleHidden => {
-                    let current = ui.ctx().data(|d| d.get_temp::<bool>("perf_hidden_show".into()).unwrap_or(false));
-                    ui.ctx().data_mut(|d| d.insert_temp("perf_hidden_show".into(), !current));
-            },
+                let current = ui
+                    .ctx()
+                    .data(|d| d.get_temp::<bool>("perf_hidden_show".into()).unwrap_or(false));
+                ui.ctx().data_mut(|d| d.insert_temp("perf_hidden_show".into(), !current));
+            }
             PerformanceAction::SetCpuBoost(boost) => {
                 if self.status.performance_mode == "Custom" {
                     if let Some(ref device) = self.device {
@@ -717,7 +775,7 @@ impl RazerGuiApp {
                         }
                     }
                 }
-            },
+            }
             PerformanceAction::SetGpuBoost(boost) => {
                 if self.status.performance_mode == "Custom" {
                     if let Some(ref device) = self.device {
@@ -729,46 +787,42 @@ impl RazerGuiApp {
                         }
                     }
                 }
-                }
+            }
         }
-    } 
+    }
 
     fn set_fan_mode(&mut self, mode: &str, rpm: Option<u16>) {
         if let Some(ref device) = self.device {
             let result = match mode {
-                "auto" => {
-                    match command::set_fan_mode(device, FanMode::Auto) {
-                        Ok(_) => {
-                            self.status.fan_speed = "Auto".to_string();
-                            self.status.fan_rpm = None;
-                            Ok(())
-                        },
-                        Err(e) => Err(e),
+                "auto" => match command::set_fan_mode(device, FanMode::Auto) {
+                    Ok(_) => {
+                        self.status.fan_speed = "Auto".to_string();
+                        self.status.fan_rpm = None;
+                        Ok(())
                     }
+                    Err(e) => Err(e),
                 },
-                "manual" => {
-                    match command::set_fan_mode(device, FanMode::Manual) {
-                        Ok(_) => {
-                            let rpm_val = rpm.unwrap_or(2000);
-                            match command::set_fan_rpm(device, rpm_val, true) {
-                                Ok(_) => {
-                                    self.status.fan_speed = "Manual".to_string();
-                                    self.status.fan_rpm = Some(rpm_val);
-                                    Ok(())
-                                },
-                                Err(e) => Err(e),
+                "manual" => match command::set_fan_mode(device, FanMode::Manual) {
+                    Ok(_) => {
+                        let rpm_val = rpm.unwrap_or(2000);
+                        match command::set_fan_rpm(device, rpm_val, true) {
+                            Ok(_) => {
+                                self.status.fan_speed = "Manual".to_string();
+                                self.status.fan_rpm = Some(rpm_val);
+                                Ok(())
                             }
-                        },
-                        Err(e) => Err(e),
+                            Err(e) => Err(e),
+                        }
                     }
-                }
+                    Err(e) => Err(e),
+                },
                 _ => return,
             };
 
             match result {
                 Ok(_) => {
                     self.set_optional_status_message(format!("Fan set to {} mode", mode));
-                },
+                }
                 Err(e) => {
                     self.set_status_message(format!("Failed to set fan: {}", e));
                 }
@@ -783,12 +837,12 @@ impl RazerGuiApp {
             self.device.as_ref(),
             |device| command::set_fan_rpm(device, rpm, true),
             &format!("Fans RPM set to: {}", rpm),
-            "Failed to set fan RPM"
+            "Failed to set fan RPM",
         ) {
             Ok(message) => {
                 self.status.fan_rpm = Some(rpm);
                 self.set_optional_status_message(message);
-            },
+            }
             Err(message) => {
                 self.set_error_message(message);
             }
@@ -799,7 +853,9 @@ impl RazerGuiApp {
         if self.status.fan_speed == "Manual" {
             if let Some(ref device) = self.device {
                 // Periodically re-set manual RPM (device may drift after perf mode changes).
-                if let Some(current_set_rpm) = get_fan_rpm_set(device, librazer::types::FanZone::Zone1) {
+                if let Some(current_set_rpm) =
+                    get_fan_rpm_set(device, librazer::types::FanZone::Zone1)
+                {
                     if let Ok(_) = command::set_fan_rpm(device, current_set_rpm, true) {
                         self.manual_fan_rpm = current_set_rpm;
                         self.status.fan_rpm = Some(current_set_rpm);
@@ -810,10 +866,9 @@ impl RazerGuiApp {
         }
     }
 
-
     fn render_fan_section(&mut self, ui: &mut egui::Ui) {
         use ui::fan::{render_fan_section, FanAction};
-        
+
         let key = egui::Id::new("max_fan_speed_enabled");
         let mut max_enabled = ui.ctx().data(|d| d.get_temp::<bool>(key).unwrap_or(false));
         let (action, new_toggle) = render_fan_section(
@@ -828,30 +883,38 @@ impl RazerGuiApp {
         );
         if new_toggle != max_enabled && self.status.performance_mode == "Custom" {
             if let Some(ref device) = self.device {
-                let result = if new_toggle { command::set_max_fan_speed_mode(device, MaxFanSpeedMode::Enable) } else { command::set_max_fan_speed_mode(device, MaxFanSpeedMode::Disable) };
+                let result = if new_toggle {
+                    command::set_max_fan_speed_mode(device, MaxFanSpeedMode::Enable)
+                } else {
+                    command::set_max_fan_speed_mode(device, MaxFanSpeedMode::Disable)
+                };
                 match result {
                     Ok(_) => {
                         max_enabled = new_toggle;
-                        self.set_optional_status_message(if new_toggle { "Max fan enabled".into() } else { "Max fan disabled".into() });
-                    },
+                        self.set_optional_status_message(if new_toggle {
+                            "Max fan enabled".into()
+                        } else {
+                            "Max fan disabled".into()
+                        });
+                    }
                     Err(e) => self.set_error_message(format!("Failed to toggle max fan: {}", e)),
                 }
             }
         }
         ui.ctx().data_mut(|d| d.insert_temp(key, max_enabled));
-        
+
         match action {
-            FanAction::None => {},
+            FanAction::None => {}
             FanAction::SetAutoMode => {
                 self.set_fan_mode("auto", None);
-            },
+            }
             FanAction::SetManualMode(rpm) => {
                 self.set_fan_mode("manual", Some(rpm));
-            },
+            }
             FanAction::SetManualRpm(rpm) => {
                 self.set_fan_rpm_only(rpm);
-            },
-            FanAction::SliderDragging(_) => {},
+            }
+            FanAction::SliderDragging(_) => {}
         }
     }
 
@@ -860,17 +923,17 @@ impl RazerGuiApp {
             Some(mode) => mode,
             None => return,
         };
-        
+
         match execute_device_command_simple(
             self.device.as_ref(),
             |device| command::set_logo_mode(device, logo_mode),
             &format!("Logo mode set to {}", mode),
-            "Failed to set logo mode"
+            "Failed to set logo mode",
         ) {
             Ok(message) => {
                 self.status.logo_mode = mode.to_string();
                 self.set_optional_status_message(message);
-            },
+            }
             Err(message) => {
                 self.set_error_message(message);
             }
@@ -881,14 +944,17 @@ impl RazerGuiApp {
         match execute_device_command_simple(
             self.device.as_ref(),
             |device| command::set_keyboard_brightness(device, brightness),
-            &format!("Brightness set to step {}", ui::lighting::raw_brightness_to_step_index(brightness)),
-            "Failed to set brightness"
+            &format!(
+                "Brightness set to step {}",
+                ui::lighting::raw_brightness_to_step_index(brightness)
+            ),
+            "Failed to set brightness",
         ) {
             Ok(message) => {
                 self.status.keyboard_brightness = brightness;
                 self.temp_brightness_step = ui::lighting::raw_brightness_to_step_index(brightness);
                 self.set_optional_status_message(message);
-            },
+            }
             Err(message) => {
                 self.set_error_message(message);
             }
@@ -896,21 +962,21 @@ impl RazerGuiApp {
     }
 
     fn toggle_lights_always_on(&mut self) {
-        let lights_always_on = if self.status.lights_always_on { 
+        let lights_always_on = if self.status.lights_always_on {
             LightsAlwaysOn::Enable
-        } else { 
+        } else {
             LightsAlwaysOn::Disable
         };
-        
+
         if let Some(ref device) = self.device {
             match command::set_lights_always_on(device, lights_always_on) {
                 Ok(_) => {
                     self.set_optional_status_message(format!(
-                        "Keyboard Backlight Always On {}", 
+                        "Keyboard Backlight Always On {}",
                         if self.status.lights_always_on { "enabled" } else { "disabled" }
                     ));
                     self.update_stored_device_state();
-                },
+                }
                 Err(e) => {
                     self.set_status_message(format!("Failed to set lights always on: {}", e));
                     self.status.lights_always_on = !self.status.lights_always_on;
@@ -923,46 +989,43 @@ impl RazerGuiApp {
 
     fn render_lighting_section(&mut self, ui: &mut egui::Ui) {
         use ui::lighting::render_lighting_section;
-        
+
         let action = render_lighting_section(
             ui,
             &self.status.logo_mode,
             &mut self.temp_brightness_step,
             &mut self.status.lights_always_on,
         );
-        
+
         if let Some(active) = action.slider_active {
             self.brightness_slider_active = active;
         }
-        
+
         if let Some(mode) = action.logo_mode {
             self.set_logo_mode(&mode);
         }
-        
+
         if let Some(brightness) = action.brightness {
             self.set_brightness(brightness);
         }
-        
+
         if action.lights_always_on {
             self.toggle_lights_always_on();
         }
     }
 
     fn toggle_battery_care(&mut self) {
-        let battery_care = if self.status.battery_care { 
-            BatteryCare::Enable 
-        } else { 
-            BatteryCare::Disable 
-        };
-        
+        let battery_care =
+            if self.status.battery_care { BatteryCare::Enable } else { BatteryCare::Disable };
+
         if let Some(ref device) = self.device {
             match command::set_battery_care(device, battery_care) {
                 Ok(_) => {
                     self.set_optional_status_message(format!(
-                        "Battery care {}", 
+                        "Battery care {}",
                         if self.status.battery_care { "enabled" } else { "disabled" }
                     ));
-                },
+                }
                 Err(e) => {
                     self.set_status_message(format!("Failed to set battery care: {}", e));
                     // Revert the UI change on error
@@ -976,18 +1039,16 @@ impl RazerGuiApp {
 
     fn render_battery_section(&mut self, ui: &mut egui::Ui) {
         use ui::battery::{render_battery_section, BatteryAction};
-        
-    let action = render_battery_section(ui, &mut self.status.battery_care);
-        
+
+        let action = render_battery_section(ui, &mut self.status.battery_care);
+
         match action {
-            BatteryAction::None => {},
+            BatteryAction::None => {}
             BatteryAction::ToggleBatteryCare => {
                 self.toggle_battery_care();
-            },
+            }
         }
     }
-
-    
 }
 
 impl eframe::App for RazerGuiApp {
@@ -996,7 +1057,8 @@ impl eframe::App for RazerGuiApp {
 
         self.process_background_initialization();
 
-        let hidden_on = ctx.data(|d| d.get_temp::<bool>("perf_hidden_show".into()).unwrap_or(false));
+        let hidden_on =
+            ctx.data(|d| d.get_temp::<bool>("perf_hidden_show".into()).unwrap_or(false));
         if self.device.is_some() {
             if hidden_on {
                 self.available_performance_modes = PerfMode::iter().collect();
@@ -1004,11 +1066,9 @@ impl eframe::App for RazerGuiApp {
                 self.detect_available_performance_modes();
             }
         }
-        
+
         self.message_manager.update();
-        
-        
-        
+
         // When minimized, poll infrequently to catch external performance mode changes
         let minimized = ctx.input(|i| i.viewport().minimized.unwrap_or(false));
         if minimized && self.fully_initialized {
@@ -1019,16 +1079,17 @@ impl eframe::App for RazerGuiApp {
                         let new_mode = Self::perf_mode_to_string(perf_mode).to_string();
                         if self.status.performance_mode != new_mode {
                             self.status.performance_mode = new_mode;
-                            let (fan_speed, fan_rpm) = Self::get_fan_status_from_mode(fan_mode, device);
+                            let (fan_speed, fan_rpm) =
+                                Self::get_fan_status_from_mode(fan_mode, device);
                             self.status.fan_speed = fan_speed;
                             self.status.fan_rpm = fan_rpm;
-            }
+                        }
                     }
                 }
                 self.last_perf_poll_time = std::time::Instant::now();
             }
         }
-        
+
         // Handle close request from X button
         if ctx.input(|i| i.viewport().close_requested()) {
             self.should_quit = true;
@@ -1040,7 +1101,7 @@ impl eframe::App for RazerGuiApp {
             return;
         }
 
-    // Only update when window is not minimized to save resources
+        // Only update when window is not minimized to save resources
         if !ctx.input(|i| i.viewport().minimized.unwrap_or(false)) {
             // Only do regular updates if fully initialized to avoid slow operations during startup
             if self.fully_initialized {
@@ -1053,31 +1114,33 @@ impl eframe::App for RazerGuiApp {
                             if current_ac_power != self.ac_power {
                                 self.ac_power = current_ac_power;
                                 self.auto_switch_profile();
-                                
                             }
                         }
-                    
+
                         if let Some(ref device) = self.device {
-                            self.status.fan_actual_rpm = get_fan_rpm_actual(device, librazer::types::FanZone::Zone1);
-                            
+                            self.status.fan_actual_rpm =
+                                get_fan_rpm_actual(device, librazer::types::FanZone::Zone1);
+
                             let (current_fan_mode, _) = Self::read_current_fan_state(device);
-                            let (fan_speed, _) = Self::get_fan_status_from_mode(current_fan_mode, device);
+                            let (fan_speed, _) =
+                                Self::get_fan_status_from_mode(current_fan_mode, device);
                             self.status.fan_speed = fan_speed;
                         }
-                        
+
                         if self.last_fan_enforce_time.elapsed().as_secs_f32() >= 1.0 {
                             self.enforce_manual_fan_rpm();
                         }
-                        
+
                         if let Some(ref device) = self.device {
                             if !self.brightness_slider_active {
                                 if let Ok(brightness) = command::get_keyboard_brightness(device) {
                                     self.status.keyboard_brightness = brightness;
-                                    self.temp_brightness_step = ui::lighting::raw_brightness_to_step_index(brightness);
+                                    self.temp_brightness_step =
+                                        ui::lighting::raw_brightness_to_step_index(brightness);
                                 }
                             }
                         }
-                        
+
                         self.sync_other_dynamic_state();
                         if self.device.is_some() {
                             if self.last_state_check_time.elapsed().as_secs_f32() >= 3.0 {
@@ -1089,11 +1152,11 @@ impl eframe::App for RazerGuiApp {
                             }
                         }
                     }
-                    
+
                     self.last_refresh_time = std::time::Instant::now();
                 }
-            } 
-        } 
+            }
+        }
         // Enforce a minimum detecting period before showing "No device detected"
         if self.detecting_device && self.device.is_none() && self.device_detection_done {
             if std::time::Instant::now() >= self.min_detecting_until {
@@ -1101,16 +1164,20 @@ impl eframe::App for RazerGuiApp {
             }
         }
         // (clear_status_message_if_disabled removed)
-        let footer_height = egui::TopBottomPanel::bottom("footer").show(ctx, |ui| {
-            ui::footer::render_footer(ui, &mut self.status_messages);
-        }).response.rect.height();
-        
-    let central_response = egui::CentralPanel::default().show(ctx, |ui| {
+        let footer_height = egui::TopBottomPanel::bottom("footer")
+            .show(ctx, |ui| {
+                ui::footer::render_footer(ui, &mut self.status_messages);
+            })
+            .response
+            .rect
+            .height();
+
+        let central_response = egui::CentralPanel::default().show(ctx, |ui| {
             // Header with device name and status messages
             ui::header::render_header(
-                ui, 
+                ui,
                 ctx,
-                self.loading, 
+                self.loading,
                 &self.system_specs,
                 &self.device,
                 &self.message_manager,
@@ -1130,10 +1197,13 @@ impl eframe::App for RazerGuiApp {
             self.render_battery_section(ui);
         });
         // Discrete height adjustment only when custom/debug controls appear or disappear
-    let custom_visible_now = (self.device.is_some() && self.status.performance_mode == "Custom") || self.status_messages;
+        let custom_visible_now = (self.device.is_some()
+            && self.status.performance_mode == "Custom")
+            || self.status_messages;
         if self.base_window_height == 0.0 {
             // Capture initial (non-custom) height once
-            self.base_window_height = central_response.response.rect.height() + footer_height + 16.0;
+            self.base_window_height =
+                central_response.response.rect.height() + footer_height + 16.0;
         }
         if custom_visible_now != self.custom_controls_visible_last {
             let width = 450.0;
@@ -1141,31 +1211,33 @@ impl eframe::App for RazerGuiApp {
                 // Estimate added height for custom controls (CPU row + GPU row + spacing)
                 let added = 3.0 * ctx.style().spacing.interact_size.y;
                 self.expanded_window_height = Some(self.base_window_height + added);
-                ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(width, self.expanded_window_height.unwrap())));
+                ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(
+                    width,
+                    self.expanded_window_height.unwrap(),
+                )));
             } else {
-                ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(width, self.base_window_height)));
+                ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(
+                    width,
+                    self.base_window_height,
+                )));
             }
             self.custom_controls_visible_last = custom_visible_now;
         }
-        
     }
-} fn load_icon() -> IconData {
+}
+fn load_icon() -> IconData {
     const ICON_DATA: &[u8] = include_bytes!("../rhelper.ico");
-    
+
     if let Ok(image) = image::load_from_memory(ICON_DATA) {
         let image = image.resize_exact(32, 32, image::imageops::FilterType::Lanczos3).to_rgba8();
         let (width, height) = image.dimensions();
         let rgba = image.into_raw();
-        
-        IconData {
-            rgba,
-            width,
-            height,
-        }
+
+        IconData { rgba, width, height }
     } else {
         let size = 32;
         let mut rgba = vec![0u8; (size * size * 4) as usize];
-        
+
         for i in 0..(size * size) as usize {
             let base = i * 4;
             rgba[base] = 0;
@@ -1173,21 +1245,18 @@ impl eframe::App for RazerGuiApp {
             rgba[base + 2] = 255;
             rgba[base + 3] = 255;
         }
-        
-        IconData {
-            rgba,
-            width: size,
-            height: size,
-        }
+
+        IconData { rgba, width: size, height: size }
     }
 }
 
 #[cfg(windows)]
 fn set_windows_app_id() {
-    use windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID;
     use windows::core::PCWSTR;
+    use windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID;
     // Build a per-version AppUserModelID so taskbar grouping updates with releases
-    let app_id = format!("RHelper.Application.{}\0", APP_VERSION).encode_utf16().collect::<Vec<u16>>();
+    let app_id =
+        format!("RHelper.Application.{}\0", APP_VERSION).encode_utf16().collect::<Vec<u16>>();
     unsafe {
         let _ = SetCurrentProcessExplicitAppUserModelID(PCWSTR(app_id.as_ptr()));
     }
@@ -1219,9 +1288,11 @@ fn main() -> Result<(), eframe::Error> {
             let ctx = cc.egui_ctx.clone();
             std::thread::spawn(move || {
                 std::thread::sleep(std::time::Duration::from_millis(500));
-                ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(egui::WindowLevel::Normal));
+                ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(
+                    egui::WindowLevel::Normal,
+                ));
             });
-            
+
             let mut app = RazerGuiApp::new();
             app.base_window_height = initial_height as f32;
             Ok(Box::new(app))

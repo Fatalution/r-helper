@@ -1,8 +1,8 @@
 // UI modules
 
-pub mod performance;
-pub mod fan;
-pub mod lighting;
 pub mod battery;
-pub mod header;
+pub mod fan;
 pub mod footer;
+pub mod header;
+pub mod lighting;
+pub mod performance;

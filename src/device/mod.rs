@@ -1,6 +1,6 @@
 // Device domain types and helpers
 use anyhow::Result;
-use librazer::types::{BatteryCare, LightsAlwaysOn, LogoMode, FanMode, PerfMode};
+use librazer::types::{BatteryCare, FanMode, LightsAlwaysOn, LogoMode, PerfMode};
 use librazer::{command, device};
 
 #[derive(Debug, Clone, PartialEq)]

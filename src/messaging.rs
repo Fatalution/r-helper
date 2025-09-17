@@ -1,5 +1,5 @@
 //! Centralized user messaging system
-//! 
+//!
 //! Provides status and error message handling with fade animations.
 
 use std::time::{Duration, Instant};
@@ -37,35 +37,26 @@ pub struct UserMessage {
 
 impl UserMessage {
     /// Create a new user message
-    pub fn new(
-        content: String,
-        message_type: MessageType,
-        priority: MessagePriority,
-    ) -> Self {
+    pub fn new(content: String, message_type: MessageType, priority: MessagePriority) -> Self {
         let duration = match priority {
             MessagePriority::Normal => Duration::from_secs(3),
             MessagePriority::Critical => Duration::from_secs(8),
         };
-        
-        Self {
-            content,
-            message_type,
-            timestamp: Instant::now(),
-            duration,
-        }
+
+        Self { content, message_type, timestamp: Instant::now(), duration }
     }
-    
+
     /// Check if this message has expired
     pub fn is_expired(&self) -> bool {
         // Allow extra time for fade animation (3 second display + 2.1 second fade)
         self.timestamp.elapsed() > (self.duration + std::time::Duration::from_millis(2100))
     }
-    
+
     /// Check if this message should start fading
     pub fn should_fade(&self) -> bool {
         self.timestamp.elapsed() > self.duration
     }
-    
+
     /// Get the age of this message in seconds
     pub fn age_seconds(&self) -> f32 {
         self.timestamp.elapsed().as_secs_f32()
@@ -85,12 +76,9 @@ pub struct MessageManager {
 impl MessageManager {
     /// Create a new message manager
     pub fn new() -> Self {
-        Self {
-            current_message: None,
-            message_queue: Vec::new(),
-        }
+        Self { current_message: None, message_queue: Vec::new() }
     }
-    
+
     /// Add a new message, overriding current message instantly
     pub fn add_message(&mut self, message: UserMessage) {
         // New messages always override current messages for instant display
@@ -100,12 +88,12 @@ impl MessageManager {
                 self.message_queue.push(current.clone());
             }
         }
-        
+
         // Set new message immediately
         self.current_message = Some(message);
         self.cleanup_queue();
     }
-    
+
     /// Get the current message that should be displayed
     pub fn get_current_message(&self) -> Option<&UserMessage> {
         if let Some(current) = &self.current_message {
@@ -118,7 +106,7 @@ impl MessageManager {
             None
         }
     }
-    
+
     /// Update the message manager (call this each frame)
     pub fn update(&mut self) {
         if let Some(current) = &self.current_message {
@@ -130,7 +118,7 @@ impl MessageManager {
             self.promote_next_message();
         }
     }
-    
+
     /// Promote the next message from queue
     fn promote_next_message(&mut self) {
         if let Some(next) = self.message_queue.pop() {
@@ -141,11 +129,11 @@ impl MessageManager {
             }
         }
     }
-    
+
     /// Remove expired messages from queue
     fn cleanup_queue(&mut self) {
         self.message_queue.retain(|m| !m.is_expired());
-        
+
         // Limit queue size
         if self.message_queue.len() > 10 {
             self.message_queue.truncate(10);

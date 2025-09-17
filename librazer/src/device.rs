@@ -39,10 +39,7 @@ impl Device {
             let path = info.path();
             let device = api.open_path(path)?;
             if device.send_feature_report(&[0, 0]).is_ok() {
-                return Ok(Device {
-                    device,
-                    info: descriptor.clone(),
-                });
+                return Ok(Device { device, info: descriptor.clone() });
             }
         }
         anyhow::bail!("Failed to open device {:?}", descriptor)

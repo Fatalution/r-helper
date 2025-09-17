@@ -1,6 +1,6 @@
-use eframe::egui::{self, Layout, Align, Color32, RichText};
-use crate::system::SystemSpecs;
 use crate::messaging::{MessageManager, MessageType};
+use crate::system::SystemSpecs;
+use eframe::egui::{self, Align, Color32, Layout, RichText};
 use librazer::device::Device;
 
 const FADE_START_TIME: f32 = 3.0;
@@ -20,13 +20,13 @@ pub fn render_header(
     ui.horizontal(|ui| {
         // Device name
         render_device_name(ui, device, system_specs);
-        
+
         // Status messages and connection status
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             if loading {
                 ui.spinner();
             }
-            
+
             // Status/warning messages
             render_status_messages(ui, ctx, message_manager, device, detecting_device);
         });
@@ -44,7 +44,7 @@ fn render_device_name(ui: &mut egui::Ui, device: &Option<Device>, system_specs: 
     } else {
         "💻 No Razer Device".to_string()
     };
-    
+
     ui.add(egui::Label::new(egui::RichText::new(device_text).heading()).selectable(false));
 }
 
@@ -58,14 +58,19 @@ fn render_status_messages(
 ) {
     if let Some(current_message) = message_manager.get_current_message() {
         let elapsed = current_message.age_seconds();
-        
+
         // Calculate fade and apply to message
         let (base_color, icon) = get_message_style_from_type(&current_message.message_type);
         let alpha = calculate_fade_alpha(elapsed);
         let faded_color = apply_alpha_to_color(base_color, alpha);
-        
-        ui.add(egui::Label::new(RichText::new(format!("{} {}", icon, current_message.content)).color(faded_color)).selectable(false));
-        
+
+        ui.add(
+            egui::Label::new(
+                RichText::new(format!("{} {}", icon, current_message.content)).color(faded_color),
+            )
+            .selectable(false),
+        );
+
         // Request repaint for smooth animation
         if current_message.should_fade() {
             ctx.request_repaint();
@@ -74,10 +79,18 @@ fn render_status_messages(
         // Show connection status when no device detected
         if device.is_none() {
             if detecting_device {
-                ui.add(egui::Label::new(RichText::new("🔎 Detecting device…").color(Color32::LIGHT_BLUE)).selectable(false));
+                ui.add(
+                    egui::Label::new(
+                        RichText::new("🔎 Detecting device…").color(Color32::LIGHT_BLUE),
+                    )
+                    .selectable(false),
+                );
                 ctx.request_repaint();
             } else {
-                ui.add(egui::Label::new(RichText::new("❌ No device detected").color(Color32::RED)).selectable(false));
+                ui.add(
+                    egui::Label::new(RichText::new("❌ No device detected").color(Color32::RED))
+                        .selectable(false),
+                );
             }
         }
     }
@@ -105,7 +118,7 @@ fn calculate_fade_alpha(elapsed: f32) -> f32 {
 fn apply_alpha_to_color(base_color: Color32, alpha: f32) -> Color32 {
     Color32::from_rgba_unmultiplied(
         base_color.r(),
-        base_color.g(), 
+        base_color.g(),
         base_color.b(),
         (FULL_ALPHA as f32 * alpha) as u8,
     )

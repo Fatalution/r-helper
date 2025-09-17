@@ -36,23 +36,18 @@ pub struct LightingAction {
 
 impl Default for LightingAction {
     fn default() -> Self {
-        Self {
-            logo_mode: None,
-            brightness: None,
-            lights_always_on: false,
-            slider_active: None,
-        }
+        Self { logo_mode: None, brightness: None, lights_always_on: false, slider_active: None }
     }
 }
 
 /// Renders the lighting section UI
-/// 
+///
 /// # Arguments
 /// * `ui` - The egui UI context
 /// * `logo_mode` - The current logo lighting mode
 /// * `temp_brightness_step` - Mutable reference to brightness step index (0-15)
 /// * `lights_always_on` - Mutable reference to lights always on setting
-/// 
+///
 /// # Returns
 /// The action requested by the user, if any
 pub fn render_lighting_section(
@@ -62,21 +57,21 @@ pub fn render_lighting_section(
     lights_always_on: &mut bool,
 ) -> LightingAction {
     let mut action = LightingAction::default();
-    
+
     ui.group(|ui| {
         ui.add(egui::Label::new("💡 Lighting").selectable(false));
         ui.separator();
-        
+
         // Logo Mode Selection
         render_logo_mode_selection(ui, logo_mode, &mut action);
-        
+
         // Brightness Slider
         render_brightness_controls(ui, temp_brightness_step, &mut action);
-        
+
         // Lights Always On Toggle
         render_always_on_toggle(ui, lights_always_on, &mut action);
     });
-    
+
     action
 }
 
@@ -85,7 +80,7 @@ fn render_logo_mode_selection(ui: &mut egui::Ui, logo_mode: &str, action: &mut L
     ui.horizontal(|ui| {
         ui.add(egui::Label::new("Logo Mode:").selectable(false));
         const LOGO_MODES: &[&str] = &["Static", "Breathing", "Off"];
-        
+
         for mode in LOGO_MODES {
             let selected = logo_mode == *mode;
             if ui.selectable_label(selected, *mode).clicked() && !selected {
@@ -96,24 +91,28 @@ fn render_logo_mode_selection(ui: &mut egui::Ui, logo_mode: &str, action: &mut L
 }
 
 /// Renders the brightness control slider
-fn render_brightness_controls(ui: &mut egui::Ui, temp_brightness_step: &mut usize, action: &mut LightingAction) {
+fn render_brightness_controls(
+    ui: &mut egui::Ui,
+    temp_brightness_step: &mut usize,
+    action: &mut LightingAction,
+) {
     ui.horizontal(|ui| {
         ui.add(egui::Label::new("Keyboard Brightness:").selectable(false));
-        
+
         // Ensure step index is within bounds
         *temp_brightness_step = (*temp_brightness_step).min(BRIGHTNESS_LEVELS.len() - 1);
-        
+
         let mut step_index = *temp_brightness_step;
         let brightness_response = ui.add(
             egui::Slider::new(&mut step_index, 0..=(BRIGHTNESS_LEVELS.len() - 1))
                 .custom_formatter(|val, _| format!("{}", val as usize))
-                .custom_parser(|s| s.parse::<f64>().ok())
+                .custom_parser(|s| s.parse::<f64>().ok()),
         );
-        
+
         // Check if the value actually changed
         let value_changed = step_index != *temp_brightness_step;
         *temp_brightness_step = step_index;
-        
+
         // Track slider interaction state
         if brightness_response.dragged() || brightness_response.has_focus() {
             action.slider_active = Some(true);
@@ -135,7 +134,11 @@ fn render_brightness_controls(ui: &mut egui::Ui, temp_brightness_step: &mut usiz
 }
 
 /// Renders the always on toggle control
-fn render_always_on_toggle(ui: &mut egui::Ui, lights_always_on: &mut bool, action: &mut LightingAction) {
+fn render_always_on_toggle(
+    ui: &mut egui::Ui,
+    lights_always_on: &mut bool,
+    action: &mut LightingAction,
+) {
     ui.horizontal(|ui| {
         if ui.checkbox(lights_always_on, "Keyboard Backlight Always On").clicked() {
             action.lights_always_on = true;

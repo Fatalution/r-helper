@@ -1,0 +1,25 @@
+# rustfmt configuration for r-helper
+# Reference: https://rust-lang.github.io/rustfmt/
+
+# Line width
+max_width = 100
+
+# Imports
+reorder_imports = true
+
+# Edition specifics (inherits from Cargo.toml, but keep consistent behavior)
+edition = "2021"
+
+# Formatting heuristics
+use_small_heuristics = "Max"
+
+# (Nightly-only comment formatting options removed for stable)
+
+# Misc style
+newline_style = "Auto"
+use_field_init_shorthand = true
+force_explicit_abi = true
+
+# (Unstable features flag removed; using stable rustfmt only)
+
+# Format generated files? Usually false; leave default behavior.
