@@ -1236,9 +1236,7 @@ impl eframe::App for RazerGuiApp {
             self.render_battery_section(ui);
         });
         // Discrete height adjustment only when custom/debug controls appear or disappear
-        let custom_visible_now = (self.device.is_some()
-            && self.status.performance_mode == "Custom")
-            || self.status_messages;
+        let custom_visible_now = self.device.is_some() && self.status.performance_mode == "Custom";
         if self.base_window_height == 0.0 {
             // Capture initial (non-custom) height once
             self.base_window_height =

@@ -53,8 +53,8 @@ pub fn render_performance_section(
             base_modes,
         );
 
-        // Custom boost controls (visible when in Custom mode OR when debug flag enabled so UI can be tested)
-        let show_custom_controls = current_performance_mode == "Custom" || debug_mode; // debug exposes UI always
+        // Custom boost controls only when in Custom mode (debug no longer forces visibility)
+        let show_custom_controls = current_performance_mode == "Custom";
         if show_custom_controls {
             ui.add_space(6.0);
             if let Some(custom_action) = render_custom_boosts(
