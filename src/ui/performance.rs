@@ -220,8 +220,18 @@ fn render_performance_header(ui: &mut egui::Ui, ac_power: bool, show_probe_butto
 
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             if show_probe_button {
-                if ui.small_button("👁").on_hover_text("Show/Hide hidden modes & boosts").clicked()
-                {
+                let active = ui
+                    .ctx()
+                    .data(|d| d.get_temp::<bool>("perf_hidden_show".into()).unwrap_or(false));
+                let mut eye_btn = egui::Button::new(RichText::new("👁"));
+                if active {
+                    let highlight = AC_SELECTED_COLOR; // reuse green
+                    eye_btn = eye_btn.fill(highlight).stroke(egui::Stroke::new(1.0, highlight));
+                } else {
+                    eye_btn = eye_btn.stroke(egui::Stroke::new(1.0, Color32::from_gray(90)));
+                }
+                let resp = ui.add(eye_btn).on_hover_text("Show/Hide hidden modes & boosts");
+                if resp.clicked() {
                     ui.ctx().data_mut(|d| d.insert_temp("perf_toggle_hidden".into(), true));
                 }
             }
