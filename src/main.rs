@@ -1305,7 +1305,7 @@ fn set_windows_app_id() {}
 
 fn main() -> Result<(), eframe::Error> {
     set_windows_app_id();
-    let initial_height = 450.0;
+    let initial_height = 500.0;
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([450.0, initial_height])
