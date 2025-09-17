@@ -738,7 +738,44 @@ impl RazerGuiApp {
 
     fn render_performance_section(&mut self, ui: &mut egui::Ui) {
         use ui::performance::{render_performance_section, PerformanceAction};
-        let (allowed_cpu, allowed_gpu, disallowed_pairs) = self.get_descriptor_allowed_boosts();
+        let (mut allowed_cpu, mut allowed_gpu, disallowed_pairs) =
+            self.get_descriptor_allowed_boosts();
+        let base_cpu = allowed_cpu.clone();
+        let base_gpu = allowed_gpu.clone();
+
+        // If user toggled the eye icon (hidden modes view), also reveal all boost options.
+        let showing_hidden =
+            ui.ctx().data(|d| d.get_temp::<bool>("perf_hidden_show".into()).unwrap_or(false));
+        if showing_hidden {
+            // Full canonical sets (excluding debug-only Undervolt which stays debug gated)
+            let full_cpu = [CpuBoost::Low, CpuBoost::Medium, CpuBoost::High, CpuBoost::Boost];
+            let full_gpu = [GpuBoost::Low, GpuBoost::Medium, GpuBoost::High];
+            for b in full_cpu {
+                if !allowed_cpu.contains(&b) {
+                    allowed_cpu.push(b);
+                }
+            }
+            for b in full_gpu {
+                if !allowed_gpu.contains(&b) {
+                    allowed_gpu.push(b);
+                }
+            }
+            // Maintain a stable displayed order
+            let order_cpu = |b: &CpuBoost| match b {
+                CpuBoost::Low => 0,
+                CpuBoost::Medium => 1,
+                CpuBoost::High => 2,
+                CpuBoost::Boost => 3,
+                CpuBoost::Undervolt => 4,
+            };
+            allowed_cpu.sort_by_key(order_cpu);
+            let order_gpu = |b: &GpuBoost| match b {
+                GpuBoost::Low => 0,
+                GpuBoost::Medium => 1,
+                GpuBoost::High => 2,
+            };
+            allowed_gpu.sort_by_key(order_gpu);
+        }
         let action = render_performance_section(
             ui,
             &self.status.performance_mode,
@@ -751,6 +788,8 @@ impl RazerGuiApp {
             &allowed_cpu,
             &allowed_gpu,
             &disallowed_pairs,
+            &base_cpu,
+            &base_gpu,
         );
 
         match action {

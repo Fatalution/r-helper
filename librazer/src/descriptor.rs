@@ -100,13 +100,32 @@ pub const SUPPORTED: &[Descriptor] = &[
             PerfMode::Hyperboost,
             PerfMode::Custom,
         ]),
-        // Example restrictions: CPU Boost available, GPU High available, but cannot have both High simultaneously
         cpu_boosts: Some(&[CpuBoost::Low, CpuBoost::Medium, CpuBoost::High]),
         gpu_boosts: Some(&[GpuBoost::Low, GpuBoost::Medium, GpuBoost::High]),
         disallowed_boost_pairs: Some(&[
             (CpuBoost::High, GpuBoost::High),
-            (CpuBoost::Boost, GpuBoost::High),
-            (CpuBoost::High, GpuBoost::Medium), // sample extra constraints (adjust as needed)
+            (CpuBoost::High, GpuBoost::Medium),
+        ]),
+    },
+    Descriptor {
+        model_number_prefix: "RZ09-05306",
+        name: "Razer Blade 14” (2025)",
+        pid: 0x02c5,
+        features: &["battery-care", "fan", "kbd-backlight", "lid-logo", "lights-always-on", "perf"],
+        init_cmds: &[0x0081, 0x0086, 0x0f90, 0x0086, 0x0f10, 0x0087],
+        perf_modes: Some(&[
+            PerfMode::Battery,
+            PerfMode::Silent,
+            PerfMode::Balanced,
+            PerfMode::Performance,
+            PerfMode::Hyperboost,
+            PerfMode::Custom,
+        ]),
+        cpu_boosts: Some(&[CpuBoost::Low, CpuBoost::Medium, CpuBoost::High]),
+        gpu_boosts: Some(&[GpuBoost::Low, GpuBoost::Medium, GpuBoost::High]),
+        disallowed_boost_pairs: Some(&[
+            (CpuBoost::High, GpuBoost::High),
+            (CpuBoost::High, GpuBoost::Medium),
         ]),
     },
 ];

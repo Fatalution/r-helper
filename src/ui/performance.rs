@@ -35,6 +35,8 @@ pub fn render_performance_section(
     allowed_cpu_boosts: &[CpuBoost],
     allowed_gpu_boosts: &[GpuBoost],
     disallowed_pairs: &[(CpuBoost, GpuBoost)],
+    base_cpu_boosts: &[CpuBoost],
+    base_gpu_boosts: &[GpuBoost],
 ) -> PerformanceAction {
     let mut action = PerformanceAction::None;
 
@@ -65,6 +67,8 @@ pub fn render_performance_section(
                 allowed_cpu_boosts,
                 allowed_gpu_boosts,
                 disallowed_pairs,
+                base_cpu_boosts,
+                base_gpu_boosts,
             ) {
                 action = custom_action;
             }
@@ -85,6 +89,8 @@ fn render_custom_boosts(
     allowed_cpu: &[CpuBoost],
     allowed_gpu: &[GpuBoost],
     disallowed_pairs: &[(CpuBoost, GpuBoost)],
+    base_cpu: &[CpuBoost],
+    base_gpu: &[GpuBoost],
 ) -> Option<PerformanceAction> {
     let mut out = None;
     // CPU row: left side label + standard boosts, right-aligned Undervolt (debug only)
@@ -121,6 +127,15 @@ fn render_custom_boosts(
                     .fill(if selected { color } else { Color32::TRANSPARENT })
                     .stroke(egui::Stroke::new(1.0, color));
                 let invalid_combo = !debug_mode && disallowed_pairs.iter().any(|(c,g)| *c == boost && *g == current_gpu);
+                let is_extra = !base_cpu.contains(&boost);
+                if is_extra && !selected {
+                    // Dim & italicize extra (revealed) boosts
+                    btn = egui::Button::new(
+                        egui::RichText::new(&label).italics().color(Color32::from_gray(170)),
+                    )
+                    .fill(Color32::TRANSPARENT)
+                    .stroke(egui::Stroke::new(1.0, Color32::from_gray(90)));
+                }
                 let response = ui.add_enabled(custom_active && !invalid_combo, btn);
                 if response.clicked() && !selected { out = Some(PerformanceAction::SetCpuBoost(boost)); }
                 if !custom_active { response.on_hover_text("Activate Custom mode to apply"); }
@@ -142,6 +157,14 @@ fn render_custom_boosts(
                 .stroke(egui::Stroke::new(1.0, color));
             let invalid_combo = !debug_mode
                 && disallowed_pairs.iter().any(|(c, g)| *c == current_cpu && *g == boost);
+            let is_extra = !base_gpu.contains(&boost);
+            if is_extra && !selected {
+                btn = egui::Button::new(
+                    egui::RichText::new(&label).italics().color(Color32::from_gray(170)),
+                )
+                .fill(Color32::TRANSPARENT)
+                .stroke(egui::Stroke::new(1.0, Color32::from_gray(90)));
+            }
             let response = ui.add_enabled(custom_active && !invalid_combo, btn);
             if response.clicked() && !selected {
                 out = Some(PerformanceAction::SetGpuBoost(boost));
@@ -168,7 +191,8 @@ fn render_performance_header(ui: &mut egui::Ui, ac_power: bool, show_probe_butto
 
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             if show_probe_button {
-                if ui.small_button("👁").on_hover_text("Show/Hide hidden modes").clicked() {
+                if ui.small_button("👁").on_hover_text("Show/Hide hidden modes & boosts").clicked()
+                {
                     ui.ctx().data_mut(|d| d.insert_temp("perf_toggle_hidden".into(), true));
                 }
             }
