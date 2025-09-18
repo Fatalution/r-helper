@@ -104,7 +104,6 @@ pub const SUPPORTED: &[Descriptor] = &[
         gpu_boosts: Some(&[GpuBoost::Low, GpuBoost::Medium, GpuBoost::High]),
         disallowed_boost_pairs: Some(&[
             (CpuBoost::High, GpuBoost::High),
-            (CpuBoost::High, GpuBoost::Medium),
         ]),
     },
     Descriptor {
@@ -125,7 +124,6 @@ pub const SUPPORTED: &[Descriptor] = &[
         gpu_boosts: Some(&[GpuBoost::Low, GpuBoost::Medium, GpuBoost::High]),
         disallowed_boost_pairs: Some(&[
             (CpuBoost::High, GpuBoost::High),
-            (CpuBoost::High, GpuBoost::Medium),
         ]),
     },
 ];
