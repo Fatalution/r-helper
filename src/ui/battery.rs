@@ -63,17 +63,17 @@ fn render_threshold_slider(ui: &mut egui::Ui, threshold: &mut u8, action: &mut B
         let changed = new_val != *threshold;
         *threshold = new_val;
 
+        // Only submit on interaction end to avoid rapid repeated device writes.
         if response.dragged() || response.has_focus() {
             action.slider_active = Some(true);
-            if changed {
-                action.set_threshold = Some(*threshold);
-            }
         } else if response.drag_stopped() || response.lost_focus() {
             action.slider_active = Some(false);
             if changed {
                 action.set_threshold = Some(*threshold);
             }
         } else if changed {
+            // Click on track or keyboard step without drag: treat as a finalized change.
+            action.slider_active = Some(false);
             action.set_threshold = Some(*threshold);
         }
     });
