@@ -102,9 +102,7 @@ pub const SUPPORTED: &[Descriptor] = &[
         ]),
         cpu_boosts: Some(&[CpuBoost::Low, CpuBoost::Medium, CpuBoost::High]),
         gpu_boosts: Some(&[GpuBoost::Low, GpuBoost::Medium, GpuBoost::High]),
-        disallowed_boost_pairs: Some(&[
-            (CpuBoost::High, GpuBoost::High),
-        ]),
+        disallowed_boost_pairs: Some(&[(CpuBoost::High, GpuBoost::High)]),
     },
     Descriptor {
         model_number_prefix: "RZ09-05306",
@@ -122,9 +120,7 @@ pub const SUPPORTED: &[Descriptor] = &[
         ]),
         cpu_boosts: Some(&[CpuBoost::Low, CpuBoost::Medium, CpuBoost::High]),
         gpu_boosts: Some(&[GpuBoost::Low, GpuBoost::Medium, GpuBoost::High]),
-        disallowed_boost_pairs: Some(&[
-            (CpuBoost::High, GpuBoost::High),
-        ]),
+        disallowed_boost_pairs: Some(&[(CpuBoost::High, GpuBoost::High)]),
     },
 ];
 

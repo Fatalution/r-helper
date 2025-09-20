@@ -12,6 +12,7 @@ pub struct CompleteDeviceState {
     pub keyboard_brightness: u8,
     pub lights_always_on: LightsAlwaysOn,
     pub battery_care: BatteryCare,
+    pub battery_threshold: u8,
 }
 
 impl Default for CompleteDeviceState {
@@ -23,7 +24,8 @@ impl Default for CompleteDeviceState {
             logo_mode: LogoMode::Off,
             keyboard_brightness: 50,
             lights_always_on: LightsAlwaysOn::Disable,
-            battery_care: BatteryCare::Enable,
+            battery_care: BatteryCare::Disable,
+            battery_threshold: 80,
         }
     }
 }
@@ -38,7 +40,7 @@ impl CompleteDeviceState {
         let logo_mode = command::get_logo_mode(device)?;
         let keyboard_brightness = command::get_keyboard_brightness(device)?;
         let lights_always_on = command::get_lights_always_on(device)?;
-        let battery_care = command::get_battery_care(device)?;
+        let (battery_care, battery_threshold) = command::get_battery_care_state(device)?;
 
         Ok(Self {
             perf_mode,
@@ -48,6 +50,7 @@ impl CompleteDeviceState {
             keyboard_brightness,
             lights_always_on,
             battery_care,
+            battery_threshold,
         })
     }
 }

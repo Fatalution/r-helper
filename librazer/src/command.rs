@@ -215,3 +215,43 @@ pub fn set_battery_care(device: &Device, mode: BatteryCare) -> Result<()> {
     ensure!(device.send(Packet::new(0x0712, args))?.get_args().starts_with(args));
     Ok(())
 }
+
+// Battery Health Optimizer raw access (threshold + on/off)
+
+/// Read raw Battery Health Optimizer byte.
+/// MSB (bit7) indicates ON (1) / OFF (0). Lower 7 bits encode threshold percent.
+pub fn get_battery_care_raw(device: &Device) -> Result<u8> {
+    Ok(device.send(Packet::new(0x0792, &[0]))?.get_args()[0])
+}
+
+/// Decode raw BHO byte to (is_on, threshold_percent)
+pub fn decode_battery_care(byte: u8) -> (bool, u8) {
+    let is_on = (byte & 0x80) != 0;
+    let threshold = byte & 0x7F;
+    (is_on, threshold)
+}
+
+fn valid_battery_threshold(threshold: u8) -> bool {
+    threshold >= 50 && threshold <= 80 && threshold % 5 == 0
+}
+
+/// Encode (is_on, threshold_percent) to raw BHO byte
+pub fn encode_battery_care(is_on: bool, threshold: u8) -> u8 {
+    (if is_on { 0x80 } else { 0x00 }) | (threshold & 0x7F)
+}
+
+/// Set Battery Health Optimizer on/off with explicit threshold (50..=80 step 5)
+pub fn set_battery_care_state_threshold(device: &Device, is_on: bool, threshold: u8) -> Result<()> {
+    ensure!(valid_battery_threshold(threshold));
+    let arg = encode_battery_care(is_on, threshold);
+    ensure!(device.send(Packet::new(0x0712, &[arg]))?.get_args().starts_with(&[arg]));
+    Ok(())
+}
+
+/// Get Battery Health Optimizer as typed state plus threshold.
+pub fn get_battery_care_state(device: &Device) -> Result<(BatteryCare, u8)> {
+    let raw = get_battery_care_raw(device)?;
+    let (on, thr) = decode_battery_care(raw);
+    let mode = if on { BatteryCare::Enable } else { BatteryCare::Disable };
+    Ok((mode, thr))
+}

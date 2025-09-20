@@ -47,6 +47,7 @@ struct DeviceStatus {
     keyboard_brightness: u8,
     lights_always_on: bool,
     battery_care: bool,
+    battery_threshold: u8,
 }
 
 impl Default for DeviceStatus {
@@ -59,7 +60,8 @@ impl Default for DeviceStatus {
             logo_mode: "Reading...".to_string(),
             keyboard_brightness: 0,
             lights_always_on: false,
-            battery_care: true,
+            battery_care: false,
+            battery_threshold: 80,
         }
     }
 }
@@ -88,6 +90,7 @@ struct RazerGuiApp {
     manual_fan_rpm: u16,
     temp_brightness_step: usize,
     brightness_slider_active: bool,
+    battery_slider_active: bool,
     should_quit: bool,
 
     init_power_read: bool,
@@ -158,8 +161,11 @@ impl RazerGuiApp {
     fn new() -> Self {
         // Profiles kept in-memory so we can auto-switch on AC/Battery changes.
         let ac_profile = CompleteDeviceState::default();
-        let battery_profile =
-            CompleteDeviceState { perf_mode: PerfMode::Battery, ..CompleteDeviceState::default() };
+        let battery_profile = CompleteDeviceState {
+            perf_mode: PerfMode::Battery,
+            battery_threshold: 80,
+            ..CompleteDeviceState::default()
+        };
 
         let (init_sender, init_receiver) = mpsc::channel();
 
@@ -186,6 +192,7 @@ impl RazerGuiApp {
             manual_fan_rpm: 2000,
             temp_brightness_step: 0,
             brightness_slider_active: false,
+            battery_slider_active: false,
 
             should_quit: false,
 
@@ -320,10 +327,10 @@ impl RazerGuiApp {
                 self.status.lights_always_on = matches!(lights_always_on, LightsAlwaysOn::Enable);
             }
 
-            if let Some(battery_care) =
-                reader.read(|d| command::get_battery_care(d), "battery care")
-            {
-                self.status.battery_care = matches!(battery_care, BatteryCare::Enable);
+            if let Some(raw) = reader.read(|d| command::get_battery_care_raw(d), "battery care") {
+                let (on, threshold) = command::decode_battery_care(raw);
+                self.status.battery_care = on;
+                self.status.battery_threshold = threshold.max(50).min(80);
             }
 
             let errors = reader.finish();
@@ -460,8 +467,10 @@ impl RazerGuiApp {
             self.status.lights_always_on = matches!(lights_always_on, LightsAlwaysOn::Enable);
         }
 
-        if let Ok(battery_care) = command::get_battery_care(device) {
-            self.status.battery_care = matches!(battery_care, BatteryCare::Enable);
+        if let Ok(raw) = command::get_battery_care_raw(device) {
+            let (on, thr) = command::decode_battery_care(raw);
+            self.status.battery_care = on;
+            self.status.battery_threshold = thr.max(50).min(80);
         }
 
         Ok(())
@@ -487,8 +496,12 @@ impl RazerGuiApp {
             if let Ok(lights_always_on) = command::get_lights_always_on(device) {
                 self.status.lights_always_on = matches!(lights_always_on, LightsAlwaysOn::Enable);
             }
-            if let Ok(battery_care) = command::get_battery_care(device) {
-                self.status.battery_care = matches!(battery_care, BatteryCare::Enable);
+            if !self.battery_slider_active {
+                if let Ok(raw) = command::get_battery_care_raw(device) {
+                    let (on, thr) = command::decode_battery_care(raw);
+                    self.status.battery_care = on;
+                    self.status.battery_threshold = thr.max(50).min(80);
+                }
             }
         }
     }
@@ -499,8 +512,12 @@ impl RazerGuiApp {
             if let Ok(lights_always_on) = command::get_lights_always_on(device) {
                 self.status.lights_always_on = matches!(lights_always_on, LightsAlwaysOn::Enable);
             }
-            if let Ok(battery_care) = command::get_battery_care(device) {
-                self.status.battery_care = matches!(battery_care, BatteryCare::Enable);
+            if !self.battery_slider_active {
+                if let Ok(raw) = command::get_battery_care_raw(device) {
+                    let (on, thr) = command::decode_battery_care(raw);
+                    self.status.battery_care = on;
+                    self.status.battery_threshold = thr.max(50).min(80);
+                }
             }
         }
     }
@@ -554,6 +571,7 @@ impl RazerGuiApp {
                         matches!(current_state.lights_always_on, LightsAlwaysOn::Enable);
                     self.status.battery_care =
                         matches!(current_state.battery_care, BatteryCare::Enable);
+                    self.status.battery_threshold = current_state.battery_threshold;
 
                     if old_perf_mode != new_perf_mode {
                         self.set_optional_status_message("Mode updated".to_string());
@@ -650,7 +668,9 @@ impl RazerGuiApp {
 
         command::set_lights_always_on(device, profile.lights_always_on)?;
 
-        command::set_battery_care(device, profile.battery_care)?;
+        let is_on = matches!(profile.battery_care, BatteryCare::Enable);
+        let threshold = profile.battery_threshold.clamp(50, 80);
+        command::set_battery_care_state_threshold(device, is_on, threshold)?;
 
         Ok(())
     }
@@ -1055,15 +1075,14 @@ impl RazerGuiApp {
     }
 
     fn toggle_battery_care(&mut self) {
-        let battery_care =
-            if self.status.battery_care { BatteryCare::Enable } else { BatteryCare::Disable };
-
         if let Some(ref device) = self.device {
-            match command::set_battery_care(device, battery_care) {
+            let is_on = self.status.battery_care;
+            let threshold = self.status.battery_threshold.clamp(50, 80);
+            match command::set_battery_care_state_threshold(device, is_on, threshold) {
                 Ok(_) => {
                     self.set_optional_status_message(format!(
                         "Battery care {}",
-                        if self.status.battery_care { "enabled" } else { "disabled" }
+                        if is_on { "enabled" } else { "disabled" }
                     ));
                 }
                 Err(e) => {
@@ -1078,14 +1097,85 @@ impl RazerGuiApp {
     }
 
     fn render_battery_section(&mut self, ui: &mut egui::Ui) {
-        use ui::battery::{render_battery_section, BatteryAction};
+        use ui::battery::render_battery_section;
 
-        let action = render_battery_section(ui, &mut self.status.battery_care);
+        let action = render_battery_section(
+            ui,
+            &mut self.status.battery_care,
+            &mut self.status.battery_threshold,
+        );
 
-        match action {
-            BatteryAction::None => {}
-            BatteryAction::ToggleBatteryCare => {
-                self.toggle_battery_care();
+        if let Some(active) = action.slider_active {
+            self.battery_slider_active = active;
+        }
+        if action.toggle_care {
+            self.toggle_battery_care();
+        }
+        if let Some(thr) = action.set_threshold {
+            if self.device.is_none() {
+                self.set_no_device_message();
+                return;
+            }
+            if !self.status.battery_care {
+                return;
+            }
+
+            let threshold = thr.clamp(50, 80);
+            let original = self.status.battery_threshold;
+
+            // Compute device result first (no self mutation while holding &device)
+            let (new_care, new_thr, err_msg, ok_msg) = {
+                let device = self.device.as_ref().unwrap();
+                let mut new_care: Option<bool> = None;
+                let new_thr: Option<u8>;
+                let mut err_msg: Option<String> = None;
+                let mut ok_msg: Option<String> = None;
+
+                match command::set_battery_care_state_threshold(device, true, threshold) {
+                    Err(e) => {
+                        err_msg = Some(format!("Failed to set battery threshold: {}", e));
+                        if let Ok((mode, read_thr)) = command::get_battery_care_state(device) {
+                            new_care = Some(matches!(mode, BatteryCare::Enable));
+                            new_thr = Some(read_thr.max(50).min(80));
+                        } else {
+                            new_thr = Some(original);
+                        }
+                    }
+                    Ok(_) => match command::get_battery_care_state(device) {
+                        Ok((mode, read_thr)) => {
+                            let on = matches!(mode, BatteryCare::Enable);
+                            if on && read_thr == threshold {
+                                new_thr = Some(threshold);
+                                ok_msg = Some(format!("Battery threshold set to {}%", threshold));
+                            } else {
+                                new_care = Some(on);
+                                new_thr = Some(read_thr.max(50).min(80));
+                                err_msg = Some(format!(
+                                    "Battery threshold mismatch (set {}%, device {}%)",
+                                    threshold, read_thr
+                                ));
+                            }
+                        }
+                        Err(_) => {
+                            new_thr = Some(original);
+                            err_msg = Some("Failed to confirm battery threshold".to_string());
+                        }
+                    },
+                }
+
+                (new_care, new_thr, err_msg, ok_msg)
+            };
+
+            if let Some(on) = new_care {
+                self.status.battery_care = on;
+            }
+            if let Some(t) = new_thr {
+                self.status.battery_threshold = t;
+            }
+            if let Some(m) = err_msg {
+                self.set_error_message(m);
+            } else if let Some(m) = ok_msg {
+                self.set_optional_status_message(m);
             }
         }
     }
